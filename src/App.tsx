@@ -151,8 +151,14 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   return (
     <Box
       sx={{
-        // Set from visualViewport so the keyboard shrinks the app instead of scrolling it.
+        // Anchored to the layout viewport, then sized and shifted to match the
+        // visible area so the on-screen keyboard never displaces the layout.
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
         height: 'var(--app-h, 100dvh)',
+        transform: 'translateY(var(--app-top, 0px))',
         width: '100%',
         maxWidth: '100vw',
         overflow: 'hidden',

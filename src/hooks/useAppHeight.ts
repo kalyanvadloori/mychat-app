@@ -1,35 +1,51 @@
 import { useEffect } from 'react';
 
 /**
- * Keeps `--app-h` equal to the actually-visible viewport height.
+ * Pins the app shell to the visible area of the screen.
  *
  * iOS Safari does not shrink the layout viewport when the keyboard opens. It
- * keeps the page full height, overlays the keyboard, and then *scrolls the page*
- * to bring the focused field into view — which drags a full-height app shell up
- * and sideways and exposes a horizontal scrollbar. Mirroring `visualViewport`
- * into a CSS variable lets the shell be exactly as tall as the visible area, so
- * the composer sits on the keyboard and nothing needs to scroll at all.
+ * overlays the keyboard and then scrolls the *visual* viewport so the focused
+ * field is visible. Two numbers describe that state and both are needed:
+ *
+ *   visualViewport.height    how much is actually visible above the keyboard
+ *   visualViewport.offsetTop how far the visual viewport has been scrolled down
+ *
+ * Sizing to `height` alone (and trying to force the page back with scrollTo)
+ * leaves the shell floating in the wrong place, because the browser has moved
+ * the visual viewport out from under it. Publishing both as CSS variables lets
+ * the shell size *and* translate to match, so the composer ends up directly on
+ * top of the keyboard the way a native chat app does.
  */
 export function useAppHeight() {
   useEffect(() => {
     const viewport = window.visualViewport;
+    const style = document.documentElement.style;
 
+    if (!viewport) {
+      // Older browsers: dynamic viewport units are the best available answer.
+      style.setProperty('--app-h', '100dvh');
+      style.setProperty('--app-top', '0px');
+      return;
+    }
+
+    let frame = 0;
     const apply = () => {
-      const height = viewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty('--app-h', `${Math.round(height)}px`);
-      // Safari can still leave the page nudged after the keyboard animates in.
-      if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
+      cancelAnimationFrame(frame);
+      // iOS fires a burst of events while the keyboard animates; only the last matters.
+      frame = requestAnimationFrame(() => {
+        style.setProperty('--app-h', `${Math.round(viewport.height)}px`);
+        style.setProperty('--app-top', `${Math.round(viewport.offsetTop)}px`);
+      });
     };
 
     apply();
-    viewport?.addEventListener('resize', apply);
-    viewport?.addEventListener('scroll', apply);
-    window.addEventListener('orientationchange', apply);
+    viewport.addEventListener('resize', apply);
+    viewport.addEventListener('scroll', apply);
 
     return () => {
-      viewport?.removeEventListener('resize', apply);
-      viewport?.removeEventListener('scroll', apply);
-      window.removeEventListener('orientationchange', apply);
+      cancelAnimationFrame(frame);
+      viewport.removeEventListener('resize', apply);
+      viewport.removeEventListener('scroll', apply);
     };
   }, []);
 }

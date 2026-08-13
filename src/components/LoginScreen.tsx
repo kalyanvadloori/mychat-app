@@ -43,7 +43,12 @@ export default function LoginScreen() {
   return (
     <Box
       sx={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
         height: 'var(--app-h, 100dvh)',
+        transform: 'translateY(var(--app-top, 0px))',
         display: 'grid',
         placeItems: 'center',
         p: 2,

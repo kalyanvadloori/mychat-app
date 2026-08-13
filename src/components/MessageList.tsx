@@ -23,6 +23,15 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
     bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages.length, peerTyping]);
 
+  // Opening the keyboard shrinks the thread; keep the newest message in view.
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) return;
+    const stick = () => bottomRef.current?.scrollIntoView({ block: 'end' });
+    viewport.addEventListener('resize', stick);
+    return () => viewport.removeEventListener('resize', stick);
+  }, []);
+
   return (
     <Box
       sx={{
