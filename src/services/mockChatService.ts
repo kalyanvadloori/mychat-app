@@ -177,16 +177,19 @@ class MockChatService implements ChatService {
   }
 
   async purgeSeen(conversationId: string) {
-    // The mock peer reads instantly, so everything currently in the thread counts as seen.
     const before = this.messages.length;
-    this.messages = this.messages.filter((m) => m.conversationId !== conversationId);
+    // Same rule as the real backend: incoming messages are seen once I have read
+    // them, but my own only once the peer's receipt has come back.
+    this.messages = this.messages.filter(
+      (m) =>
+        m.conversationId !== conversationId
+          ? true
+          : m.senderId === 'me' && m.status !== 'read',
+    );
     if (this.messages.length === before) return;
 
     const conversation = this.conversations.find((c) => c.id === conversationId);
-    if (conversation) {
-      conversation.lastMessage = undefined;
-      conversation.unreadCount = 0;
-    }
+    if (conversation) conversation.unreadCount = 0;
     this.publish(conversationId);
   }
 

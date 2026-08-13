@@ -193,32 +193,59 @@ class FirebaseChatService implements ChatService {
   }
 
   /**
-   * Everything rendered in an open thread counts as seen, so leaving it deletes
-   * the lot — for both sides, since there is only one copy in Firestore.
+   * Deletes only what *both* people have seen.
    *
-   * Messages whose server timestamp has not resolved yet are still in flight and
-   * are left alone, so a message sent a moment before navigating away survives.
+   * The person leaving has seen everything on screen, so the test is per sender:
+   *
+   *   their message — they wrote it, and I just read it → safe to delete
+   *   my message    — only once their read marker has passed it
+   *
+   * A single "delete everything I've seen" cutoff destroys outgoing messages
+   * before the other person ever receives them, which silently loses real
+   * conversation. Undelivered messages therefore survive until they are read.
    */
   async purgeSeen(conversationId: string) {
     const room = this.roomDocs.get(conversationId);
     const peerId = this.peerIdOf(conversationId);
-    if (!room?.docs.length) return;
+    const data = this.conversationDocs.get(conversationId);
+    if (!room?.docs.length || !peerId) return;
 
-    const cutoff = Date.now();
-    const seen = room.docs.filter(
-      (d) => millis(d.data().createdAt, Number.MAX_SAFE_INTEGER) <= cutoff,
-    );
+    const peerReadAt = millis(data?.lastReadAt?.[peerId], 0);
+
+    const seen = room.docs.filter((d) => {
+      const message = d.data();
+      // An unresolved server timestamp means it is still in flight.
+      const createdAt = millis(message.createdAt, Number.MAX_SAFE_INTEGER);
+      if (createdAt === Number.MAX_SAFE_INTEGER) return false;
+      if (message.senderId !== this.me.id) return true;
+      return createdAt <= peerReadAt;
+    });
     if (!seen.length) return;
+
+    const doomed = new Set(seen.map((d) => d.id));
+    const remaining = room.docs.filter((d) => !doomed.has(d.id));
 
     const batch = writeBatch(db());
     seen.forEach((d) => batch.delete(d.ref));
+    const conversationRef = doc(db(), 'conversations', conversationId);
 
-    // Nothing left to show: drop the preview so the thread leaves the sidebar.
-    if (seen.length === room.docs.length) {
-      batch.update(doc(db(), 'conversations', conversationId), {
+    if (remaining.length === 0) {
+      // Nothing left to show: drop the preview so the thread leaves the sidebar.
+      batch.update(conversationRef, {
         lastMessage: deleteField(),
         [`unread.${this.me.id}`]: 0,
-        ...(peerId ? { [`unread.${peerId}`]: 0 } : {}),
+        [`unread.${peerId}`]: 0,
+      });
+    } else {
+      // Keep the preview pointing at a message that still exists.
+      const newest = remaining[remaining.length - 1]!.data();
+      batch.update(conversationRef, {
+        lastMessage: {
+          text: newest.text ?? '',
+          senderId: newest.senderId,
+          createdAt: newest.createdAt ?? null,
+        },
+        [`unread.${this.me.id}`]: 0,
       });
     }
 
