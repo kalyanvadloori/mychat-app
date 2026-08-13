@@ -32,11 +32,12 @@ export default function ChatHeader({ peer, typing, onStartCall, onToggleProfile,
   return (
     <Stack
       direction="row"
-      spacing={1.5}
+      spacing={{ xs: 0.75, md: 1.5 }}
       sx={{
         alignItems: 'center',
-        px: { xs: 1.5, md: 3 },
-        py: 1.5,
+        px: { xs: 1, md: 3 },
+        py: { xs: 1, md: 1.5 },
+        minWidth: 0,
         borderBottom: '1px solid',
         borderColor: 'divider',
         bgcolor: (t) => alpha(t.palette.background.paper, 0.75),
@@ -45,22 +46,33 @@ export default function ChatHeader({ peer, typing, onStartCall, onToggleProfile,
       }}
     >
       {onBack && (
-        <IconButton onClick={onBack} sx={{ display: { md: 'none' } }}>
+        <IconButton onClick={onBack} sx={{ display: { md: 'none' }, flexShrink: 0, ml: -0.5 }}>
           <ArrowBackRoundedIcon />
         </IconButton>
       )}
 
       <Box
         onClick={onToggleProfile}
-        sx={{ display: 'flex', alignItems: 'center', gap: 1.5, cursor: 'pointer', minWidth: 0, flex: 1 }}
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: { xs: 1, md: 1.5 },
+          cursor: 'pointer',
+          minWidth: 0,
+          flex: 1,
+        }}
       >
-        <UserAvatar user={peer} size={42} />
+        <Box sx={{ flexShrink: 0, display: 'flex' }}>
+          <UserAvatar user={peer} size={40} />
+        </Box>
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="subtitle1" noWrap>
             {peer.name}
           </Typography>
           <Typography
             variant="caption"
+            noWrap
+            component="div"
             sx={{
               color: typing || peer.presence === 'online' ? 'success.main' : 'text.secondary',
               fontWeight: typing ? 600 : 400,
@@ -72,17 +84,18 @@ export default function ChatHeader({ peer, typing, onStartCall, onToggleProfile,
       </Box>
 
       <Tooltip title="Voice call">
-        <IconButton onClick={() => onStartCall('audio')}>
+        <IconButton onClick={() => onStartCall('audio')} sx={{ flexShrink: 0 }}>
           <CallRoundedIcon />
         </IconButton>
       </Tooltip>
       <Tooltip title="Video call">
-        <IconButton onClick={() => onStartCall('video')} color="primary">
+        <IconButton onClick={() => onStartCall('video')} color="primary" sx={{ flexShrink: 0 }}>
           <VideocamRoundedIcon />
         </IconButton>
       </Tooltip>
+      {/* The name block is tappable for contact info, so this button is desktop-only. */}
       <Tooltip title="Contact info">
-        <IconButton onClick={onToggleProfile}>
+        <IconButton onClick={onToggleProfile} sx={{ display: { xs: 'none', sm: 'inline-flex' } }}>
           <InfoOutlinedIcon />
         </IconButton>
       </Tooltip>

@@ -97,8 +97,14 @@ export default function MessageBubble({
       )}
 
       <Box
-        sx={{
-          maxWidth: { xs: '78%', md: '62%' },
+        sx={(t) => ({
+          // Incoming rows also carry a 32px avatar + gap, so they get less room.
+          maxWidth: {
+            xs: mine ? 'calc(100% - 8px)' : 'calc(100% - 48px)',
+            sm: '78%',
+            md: '62%',
+          },
+          minWidth: 0,
           px: 1.75,
           py: 1.1,
           borderRadius: 3,
@@ -107,14 +113,20 @@ export default function MessageBubble({
           borderBottomLeftRadius: !mine && endsGroup ? 6 : undefined,
           color: mine ? '#fff' : 'text.primary',
           background: mine ? ACCENT_GRADIENT : undefined,
-          bgcolor: mine ? undefined : (t) => alpha(t.palette.text.primary, 0.06),
+          // Incoming bubbles need a visible surface — a 6% tint disappears on an OLED phone.
+          ...(mine
+            ? {}
+            : {
+                bgcolor: alpha('#0F172A', 0.07),
+                ...t.applyStyles('dark', { backgroundColor: alpha('#FFFFFF', 0.11) }),
+              }),
           boxShadow: mine ? '0 6px 18px -8px rgba(99,102,241,0.65)' : 'none',
           animation: 'bubbleIn 180ms ease-out',
           '@keyframes bubbleIn': {
             from: { opacity: 0, transform: 'translateY(6px) scale(0.98)' },
             to: { opacity: 1, transform: 'none' },
           },
-        }}
+        })}
       >
         {message.attachments?.map((attachment) => (
           <Stack

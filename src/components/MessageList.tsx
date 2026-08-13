@@ -28,8 +28,11 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
       sx={{
         flex: 1,
         minHeight: 0,
+        minWidth: 0,
         overflowY: 'auto',
-        px: { xs: 2, md: 4 },
+        overflowX: 'hidden',
+        WebkitOverflowScrolling: 'touch',
+        px: { xs: 1.25, md: 4 },
         py: 2,
         // Faint dotted texture keeps the thread from reading as a flat sheet.
         backgroundImage: (t) =>
@@ -37,7 +40,7 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
         backgroundSize: '22px 22px',
       }}
     >
-      <Stack sx={{ maxWidth: 900, mx: 'auto' }}>
+      <Stack sx={{ maxWidth: 900, mx: 'auto', minWidth: 0 }}>
         {messages.map((message, index) => {
           const previous = messages[index - 1];
           const next = messages[index + 1];

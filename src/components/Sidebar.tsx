@@ -67,8 +67,8 @@ export default function Sidebar({
   const totalUnread = conversations.reduce((sum, c) => sum + c.unreadCount, 0);
 
   return (
-    <Stack sx={{ height: '100%', minHeight: 0 }}>
-      <Box sx={{ px: 2.5, pt: 2.5, pb: 1.5 }}>
+    <Stack sx={{ height: '100%', minHeight: 0, minWidth: 0 }}>
+      <Box sx={{ px: { xs: 1.75, md: 2.5 }, pt: 2.5, pb: 1.5, minWidth: 0 }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           <Box
             sx={{

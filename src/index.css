@@ -3,10 +3,20 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* Nothing in a chat app should ever scroll sideways. */
+  max-width: 100%;
+  overflow-x: hidden;
+  overscroll-behavior: none;
 }
 
 *,
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+/* Stop iOS zooming the page when a text field is focused. */
+input,
+textarea {
+  font-size: 16px;
 }

@@ -150,7 +150,14 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     <Box
       sx={{
         height: '100dvh',
-        p: { xs: 0, md: 2.5 },
+        width: '100%',
+        maxWidth: '100vw',
+        overflow: 'hidden',
+        // On phones the shell goes edge to edge, but must clear the notch and home bar.
+        pt: { xs: 'env(safe-area-inset-top)', md: 2.5 },
+        pb: { xs: 'env(safe-area-inset-bottom)', md: 2.5 },
+        pl: { xs: 'env(safe-area-inset-left)', md: 2.5 },
+        pr: { xs: 'env(safe-area-inset-right)', md: 2.5 },
         bgcolor: 'background.default',
         // Ambient accent wash behind the app shell.
         backgroundImage: (t) =>
@@ -161,6 +168,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
       <Paper
         sx={{
           height: '100%',
+          width: '100%',
+          minWidth: 0,
           display: 'flex',
           overflow: 'hidden',
           borderRadius: { xs: 0, md: 5 },

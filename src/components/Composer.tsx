@@ -76,8 +76,8 @@ export default function Composer({
   };
 
   return (
-    <Box sx={{ px: { xs: 1.5, md: 3 }, pb: 2, pt: 1 }}>
-      <Box sx={{ maxWidth: 900, mx: 'auto' }}>
+    <Box sx={{ px: { xs: 1, md: 3 }, pb: { xs: 1, md: 2 }, pt: 1, minWidth: 0 }}>
+      <Box sx={{ maxWidth: 900, mx: 'auto', minWidth: 0 }}>
         {attachments.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
             {attachments.map((attachment) => (
@@ -98,8 +98,9 @@ export default function Composer({
           sx={{
             display: 'flex',
             alignItems: 'flex-end',
-            gap: 0.5,
+            gap: { xs: 0, sm: 0.5 },
             p: 0.75,
+            minWidth: 0,
             borderRadius: 4,
             border: '1px solid',
             borderColor: 'divider',
@@ -153,7 +154,7 @@ export default function Composer({
                 send();
               }
             }}
-            sx={{ px: 1, py: 0.75, fontSize: 14.5 }}
+            sx={{ px: 1, py: 0.75, fontSize: 14.5, minWidth: 0, flex: 1 }}
           />
 
           {canSend ? (
@@ -165,6 +166,7 @@ export default function Composer({
                   color: '#fff',
                   width: 42,
                   height: 42,
+                  flexShrink: 0,
                   '&:hover': { background: ACCENT_GRADIENT, filter: 'brightness(1.08)' },
                 }}
               >
@@ -174,7 +176,7 @@ export default function Composer({
           ) : (
             <Tooltip title="Voice message (coming soon)">
               <span>
-                <IconButton disabled sx={{ width: 42, height: 42 }}>
+                <IconButton disabled sx={{ width: 42, height: 42, flexShrink: 0 }}>
                   <MicRoundedIcon fontSize="small" />
                 </IconButton>
               </span>
