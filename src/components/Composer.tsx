@@ -7,12 +7,11 @@ import Paper from '@mui/material/Paper';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import { alpha } from '@mui/material/styles';
+import { ACCENT_GRADIENT, tintPaper } from '../theme';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SentimentSatisfiedAltRoundedIcon from '@mui/icons-material/SentimentSatisfiedAltRounded';
-import { ACCENT_GRADIENT } from '../theme';
 import type { Attachment } from '../types';
 import { formatBytes } from '../utils/format';
 
@@ -104,8 +103,9 @@ export default function Composer({
             borderRadius: 4,
             border: '1px solid',
             borderColor: 'divider',
-            bgcolor: (t) => alpha(t.palette.background.paper, 0.9),
+            bgcolor: (t) => tintPaper(t, 0.95),
             backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
           }}
         >
           <Tooltip title="Emoji">

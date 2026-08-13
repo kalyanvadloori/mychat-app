@@ -10,7 +10,7 @@ import CallMadeRoundedIcon from '@mui/icons-material/CallMadeRounded';
 import CallReceivedRoundedIcon from '@mui/icons-material/CallReceivedRounded';
 import CallRoundedIcon from '@mui/icons-material/CallRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
-import { ACCENT_GRADIENT } from '../theme';
+import { ACCENT_GRADIENT, tintText } from '../theme';
 import type { CallLog, Message, User } from '../types';
 import { callDetail, callHeadline, callIsNegative } from '../utils/call';
 import { formatBytes, timeOf } from '../utils/format';
@@ -42,7 +42,7 @@ function CallRecord({ call, mine }: { call: CallLog; mine: boolean }) {
           display: 'grid',
           placeItems: 'center',
           flexShrink: 0,
-          bgcolor: mine ? alpha('#000', 0.18) : (t) => alpha(t.palette.text.primary, 0.07),
+          bgcolor: mine ? alpha('#000', 0.18) : (t) => tintText(t, 0.1),
           color: negative && !mine ? 'error.main' : 'inherit',
         }}
       >
@@ -139,7 +139,7 @@ export default function MessageBubble({
               px: 1.25,
               py: 1,
               borderRadius: 2,
-              bgcolor: mine ? alpha('#000', 0.16) : (t) => alpha(t.palette.text.primary, 0.06),
+              bgcolor: mine ? alpha('#000', 0.16) : (t) => tintText(t, 0.1),
             }}
           >
             <AttachFileRoundedIcon sx={{ fontSize: 18 }} />

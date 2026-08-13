@@ -1,6 +1,6 @@
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
+import { tintText } from '../theme';
 import type { User } from '../types';
 import UserAvatar from './UserAvatar';
 
@@ -19,7 +19,7 @@ export default function TypingIndicator({ peer }: { peer: User }) {
           py: 1.4,
           borderRadius: 3,
           borderBottomLeftRadius: 6,
-          bgcolor: (t) => alpha(t.palette.text.primary, 0.06),
+          bgcolor: (t) => tintText(t, 0.11),
           '@keyframes typingBounce': {
             '0%, 60%, 100%': { transform: 'translateY(0)', opacity: 0.45 },
             '30%': { transform: 'translateY(-5px)', opacity: 1 },

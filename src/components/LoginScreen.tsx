@@ -8,10 +8,9 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { alpha } from '@mui/material/styles';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
-import { ACCENT_GRADIENT } from '../theme';
+import { ACCENT_GRADIENT, tintPrimary, tintSecondary } from '../theme';
 
 export default function LoginScreen() {
   const { signIn, register, signInWithGoogle } = useAuth();
@@ -44,14 +43,15 @@ export default function LoginScreen() {
   return (
     <Box
       sx={{
-        height: '100dvh',
+        height: 'var(--app-h, 100dvh)',
         display: 'grid',
         placeItems: 'center',
         p: 2,
+        overflowY: 'auto',
         bgcolor: 'background.default',
         backgroundImage: (t) =>
-          `radial-gradient(90% 55% at 8% 0%, ${alpha(t.palette.primary.main, 0.18)} 0%, transparent 60%),
-           radial-gradient(70% 50% at 100% 100%, ${alpha(t.palette.secondary.main, 0.16)} 0%, transparent 60%)`,
+          `radial-gradient(90% 55% at 8% 0%, ${tintPrimary(t, 0.18)} 0%, transparent 60%),
+           radial-gradient(70% 50% at 100% 100%, ${tintSecondary(t, 0.16)} 0%, transparent 60%)`,
       }}
     >
       <Paper

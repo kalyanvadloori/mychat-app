@@ -3,7 +3,7 @@ import IconButton from '@mui/material/IconButton';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { alpha } from '@mui/material/styles';
+import { tintPaper } from '../theme';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import CallRoundedIcon from '@mui/icons-material/CallRounded';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -40,8 +40,9 @@ export default function ChatHeader({ peer, typing, onStartCall, onToggleProfile,
         minWidth: 0,
         borderBottom: '1px solid',
         borderColor: 'divider',
-        bgcolor: (t) => alpha(t.palette.background.paper, 0.75),
+        bgcolor: (t) => tintPaper(t, 0.85),
         backdropFilter: 'blur(10px)',
+        WebkitBackdropFilter: 'blur(10px)',
         flexShrink: 0,
       }}
     >

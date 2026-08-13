@@ -13,7 +13,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import { alpha, useColorScheme } from '@mui/material/styles';
+import { useColorScheme } from '@mui/material/styles';
 import AddCommentRoundedIcon from '@mui/icons-material/AddCommentRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
@@ -22,7 +22,7 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
-import { ACCENT_GRADIENT } from '../theme';
+import { ACCENT_GRADIENT, tintPrimary, tintText } from '../theme';
 import type { Conversation, User } from '../types';
 import { shortStamp } from '../utils/format';
 import UserAvatar from './UserAvatar';
@@ -150,7 +150,7 @@ export default function Sidebar({
             mt: 2,
             '& .MuiOutlinedInput-root': {
               borderRadius: 3,
-              bgcolor: (t) => alpha(t.palette.text.primary, 0.04),
+              bgcolor: (t) => tintText(t, 0.06),
               '& fieldset': { borderColor: 'transparent' },
               '&:hover fieldset': { borderColor: 'transparent' },
             },
@@ -201,8 +201,8 @@ export default function Sidebar({
                 alignItems: 'flex-start',
                 gap: 1.5,
                 '&.Mui-selected': {
-                  bgcolor: (t) => alpha(t.palette.primary.main, 0.12),
-                  '&:hover': { bgcolor: (t) => alpha(t.palette.primary.main, 0.16) },
+                  bgcolor: (t) => tintPrimary(t, 0.14),
+                  '&:hover': { bgcolor: (t) => tintPrimary(t, 0.2) },
                 },
               }}
             >

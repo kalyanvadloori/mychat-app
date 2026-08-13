@@ -6,9 +6,10 @@ import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import useMediaQuery from '@mui/material/useMediaQuery';
-import { alpha, useTheme } from '@mui/material/styles';
+import { useTheme } from '@mui/material/styles';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 import { useAuth } from './auth/context';
+import { useAppHeight } from './hooks/useAppHeight';
 import CallOverlay from './components/CallOverlay';
 import ChatHeader from './components/ChatHeader';
 import Composer from './components/Composer';
@@ -18,7 +19,7 @@ import NewChatDialog from './components/NewChatDialog';
 import ProfilePanel from './components/ProfilePanel';
 import Sidebar from './components/Sidebar';
 import { disposeChatService, getChatService } from './services';
-import { ACCENT_GRADIENT } from './theme';
+import { ACCENT_GRADIENT, tintPrimary, tintSecondary } from './theme';
 import type { Call, CallKind, Conversation, Message, User } from './types';
 
 /** Placeholder for a participant whose profile doc has not loaded yet. */
@@ -26,6 +27,7 @@ const UNKNOWN: User = { id: 'unknown', name: 'Unknown', presence: 'offline' };
 
 export default function App() {
   const { user, enabled, logout } = useAuth();
+  useAppHeight();
 
   if (enabled && user === undefined) {
     return (
@@ -149,7 +151,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   return (
     <Box
       sx={{
-        height: '100dvh',
+        // Set from visualViewport so the keyboard shrinks the app instead of scrolling it.
+        height: 'var(--app-h, 100dvh)',
         width: '100%',
         maxWidth: '100vw',
         overflow: 'hidden',
@@ -161,8 +164,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
         bgcolor: 'background.default',
         // Ambient accent wash behind the app shell.
         backgroundImage: (t) =>
-          `radial-gradient(90% 55% at 8% 0%, ${alpha(t.palette.primary.main, 0.16)} 0%, transparent 60%),
-           radial-gradient(70% 50% at 100% 100%, ${alpha(t.palette.secondary.main, 0.14)} 0%, transparent 60%)`,
+          `radial-gradient(90% 55% at 8% 0%, ${tintPrimary(t, 0.16)} 0%, transparent 60%),
+           radial-gradient(70% 50% at 100% 100%, ${tintSecondary(t, 0.14)} 0%, transparent 60%)`,
       }}
     >
       <Paper

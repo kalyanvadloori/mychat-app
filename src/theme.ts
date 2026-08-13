@@ -1,4 +1,27 @@
-import { createTheme, alpha } from '@mui/material/styles';
+import { createTheme, alpha, type Theme } from '@mui/material/styles';
+
+/**
+ * Translucent colours that actually follow the active colour scheme.
+ *
+ * `alpha(theme.palette.background.paper, 0.8)` looks right but is a trap once
+ * `cssVariables` is on: `theme.palette` holds the *light* scheme's literal values
+ * no matter which scheme is active, so dark mode ends up with a white header.
+ * The `*Channel` tokens are CSS variables that swap with the scheme, so they stay
+ * correct — and they are the only thing `rgba(R G B / a)` can interpolate.
+ */
+const channel = (token: string | undefined, fallback: string) => token ?? fallback;
+
+export const tintText = (t: Theme, opacity: number) =>
+  `rgba(${channel(t.vars?.palette.text.primaryChannel, '15 23 42')} / ${opacity})`;
+
+export const tintPaper = (t: Theme, opacity: number) =>
+  `rgba(${channel(t.vars?.palette.background.paperChannel, '255 255 255')} / ${opacity})`;
+
+export const tintPrimary = (t: Theme, opacity: number) =>
+  `rgba(${channel(t.vars?.palette.primary.mainChannel, '99 102 241')} / ${opacity})`;
+
+export const tintSecondary = (t: Theme, opacity: number) =>
+  `rgba(${channel(t.vars?.palette.secondary.mainChannel, '139 92 246')} / ${opacity})`;
 
 // Single accent used across the app. Change these two values to re-brand.
 export const ACCENT = '#6366F1';

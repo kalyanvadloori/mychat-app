@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
-import { alpha } from '@mui/material/styles';
+import { tintText } from '../theme';
 import type { Message, User } from '../types';
 import { dayLabel } from '../utils/format';
 import MessageBubble from './MessageBubble';
@@ -35,8 +35,7 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
         px: { xs: 1.25, md: 4 },
         py: 2,
         // Faint dotted texture keeps the thread from reading as a flat sheet.
-        backgroundImage: (t) =>
-          `radial-gradient(${alpha(t.palette.text.primary, 0.05)} 1px, transparent 1px)`,
+        backgroundImage: (t) => `radial-gradient(${tintText(t, 0.07)} 1px, transparent 1px)`,
         backgroundSize: '22px 22px',
       }}
     >
@@ -57,7 +56,7 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
                     label={dayLabel(message.createdAt)}
                     size="small"
                     sx={{
-                      bgcolor: (t) => alpha(t.palette.text.primary, 0.06),
+                      bgcolor: (t) => tintText(t, 0.08),
                       fontSize: 11,
                       color: 'text.secondary',
                     }}

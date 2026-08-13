@@ -3,10 +3,21 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  /* Nothing in a chat app should ever scroll sideways. */
   max-width: 100%;
-  overflow-x: hidden;
+  overflow: hidden;
   overscroll-behavior: none;
+}
+
+/*
+ * A fixed body cannot be scrolled by the browser, which is what stops iOS from
+ * dragging the whole app sideways when the on-screen keyboard opens. All real
+ * scrolling happens inside the message list instead.
+ */
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
 }
 
 *,
@@ -15,7 +26,7 @@ body,
   box-sizing: border-box;
 }
 
-/* Stop iOS zooming the page when a text field is focused. */
+/* Below 16px, iOS zooms the page when a field is focused. */
 input,
 textarea {
   font-size: 16px;
