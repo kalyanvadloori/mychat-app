@@ -31,11 +31,14 @@ export interface ChatService {
   openConversationWith(peerId: string): Promise<string>;
 
   /**
-   * Vanish mode: permanently deletes every message and call record that BOTH
-   * participants have already seen, and clears the conversation preview when
-   * nothing is left. Called when the user leaves an open thread.
+   * Vanish mode: permanently deletes the messages and call records the user has
+   * seen, and clears the conversation preview when nothing is left. Called when
+   * the user leaves an open thread. Deletion is shared — there is one copy.
    */
   purgeSeen(conversationId: string): Promise<void>;
+
+  /** Removes the thread and every message in it. Shared, so it affects both people. */
+  deleteConversation(conversationId: string): Promise<void>;
 
   /** True when file attachments can actually be uploaded by this backend. */
   supportsAttachments: boolean;

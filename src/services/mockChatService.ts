@@ -190,6 +190,12 @@ class MockChatService implements ChatService {
     this.publish(conversationId);
   }
 
+  async deleteConversation(conversationId: string) {
+    this.messages = this.messages.filter((m) => m.conversationId !== conversationId);
+    this.conversations = this.conversations.filter((c) => c.id !== conversationId);
+    this.publishConversations();
+  }
+
   async openConversationWith(peerId: string) {
     const existing = this.conversations.find((c) => c.participantIds.includes(peerId));
     if (existing) return existing.id;

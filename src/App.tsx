@@ -119,6 +119,21 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     [service],
   );
 
+  /**
+   * Backgrounding the app counts as leaving the thread too, otherwise closing the
+   * tab straight from an open chat would leave the history sitting there. This is
+   * the last reliable moment to write — `unload` is not guaranteed to flush.
+   */
+  useEffect(() => {
+    const onHidden = () => {
+      if (document.visibilityState === 'hidden' && selectedIdRef.current) {
+        void service.purgeSeen(selectedIdRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', onHidden);
+    return () => document.removeEventListener('visibilitychange', onHidden);
+  }, [service]);
+
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   const peerOf = useCallback(
@@ -164,6 +179,22 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
       return null;
     });
   }, [service]);
+
+  const deleteConversation = useCallback(
+    async (conversationId: string) => {
+      // Close it first so the thread is not rendering rows that are being deleted.
+      if (selectedIdRef.current === conversationId) {
+        selectedIdRef.current = null;
+        setSelectedId(null);
+      }
+      try {
+        await service.deleteConversation(conversationId);
+      } catch {
+        setNotice('Could not delete the chat. Check your connection and Firestore rules.');
+      }
+    },
+    [service],
+  );
 
   const startChatWith = useCallback(
     async (userId: string) => {
@@ -230,7 +261,9 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
               selectedId={selectedId}
               onSelect={openConversation}
               currentUser={currentUser}
+              peopleCount={users.length}
               onNewChat={() => setNewChatOpen(true)}
+              onDeleteConversation={(id) => void deleteConversation(id)}
               onSignOut={onSignOut}
             />
           </Box>

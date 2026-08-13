@@ -10,7 +10,7 @@ import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
-import { ACCENT_GRADIENT, tintPrimary, tintSecondary } from '../theme';
+import { ACCENT_GRADIENT, BRAND_MARK, tintPrimary, tintSecondary } from '../theme';
 
 export default function LoginScreen() {
   const { signIn, register, signInWithGoogle } = useAuth();
@@ -83,10 +83,11 @@ export default function LoginScreen() {
               placeItems: 'center',
               color: '#fff',
               fontWeight: 800,
-              fontSize: 24,
+              fontSize: 21,
+              letterSpacing: '-0.02em',
             }}
           >
-            M
+            {BRAND_MARK}
           </Box>
           <Typography variant="h5" sx={{ fontWeight: 700 }}>
             {mode === 'signin' ? 'Welcome back' : 'Create your account'}

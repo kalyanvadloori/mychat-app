@@ -33,7 +33,8 @@ service cloud.firestore {
       allow update: if isParticipant(resource.data)
         && request.resource.data.participantIds == resource.data.participantIds;
 
-      allow delete: if false;
+      // "Delete chat" removes the thread for both people.
+      allow delete: if isParticipant(resource.data);
 
       match /messages/{messageId} {
         function parent() {

@@ -2,8 +2,10 @@ import {
   Timestamp,
   addDoc,
   collection,
+  deleteDoc,
   deleteField,
   doc,
+  getDocs,
   writeBatch,
   increment,
   limitToLast,
@@ -191,23 +193,20 @@ class FirebaseChatService implements ChatService {
   }
 
   /**
-   * A message is safe to remove once the *other* participant has read it — the
-   * person leaving the thread has by definition seen everything in it. Deleting
-   * on "I have seen it" alone would destroy your own messages before the other
-   * side ever received them.
+   * Everything rendered in an open thread counts as seen, so leaving it deletes
+   * the lot — for both sides, since there is only one copy in Firestore.
+   *
+   * Messages whose server timestamp has not resolved yet are still in flight and
+   * are left alone, so a message sent a moment before navigating away survives.
    */
   async purgeSeen(conversationId: string) {
-    const data = this.conversationDocs.get(conversationId);
     const room = this.roomDocs.get(conversationId);
     const peerId = this.peerIdOf(conversationId);
-    if (!data || !room || !peerId) return;
+    if (!room?.docs.length) return;
 
-    const peerReadAt = millis(data.lastReadAt?.[peerId], 0);
-    if (peerReadAt <= 0) return;
-
+    const cutoff = Date.now();
     const seen = room.docs.filter(
-      // An unresolved server timestamp means "just now", which is never seen yet.
-      (d) => millis(d.data().createdAt, Number.MAX_SAFE_INTEGER) <= peerReadAt,
+      (d) => millis(d.data().createdAt, Number.MAX_SAFE_INTEGER) <= cutoff,
     );
     if (!seen.length) return;
 
@@ -219,11 +218,41 @@ class FirebaseChatService implements ChatService {
       batch.update(doc(db(), 'conversations', conversationId), {
         lastMessage: deleteField(),
         [`unread.${this.me.id}`]: 0,
-        [`unread.${peerId}`]: 0,
+        ...(peerId ? { [`unread.${peerId}`]: 0 } : {}),
       });
     }
 
-    await batch.commit();
+    try {
+      await batch.commit();
+    } catch (error) {
+      // Almost always means the delete rules have not been published yet.
+      console.error('[chat] purge failed — check Firestore rules allow delete:', error);
+    }
+  }
+
+  /**
+   * Firestore does not cascade: deleting a document leaves its subcollection
+   * behind as orphaned data that still counts against storage. The messages have
+   * to be fetched and deleted explicitly before the thread itself goes.
+   */
+  async deleteConversation(conversationId: string) {
+    try {
+      const messages = await getDocs(
+        collection(db(), 'conversations', conversationId, 'messages'),
+      );
+
+      // Batches cap at 500 writes, so large threads need more than one.
+      for (let i = 0; i < messages.docs.length; i += 400) {
+        const batch = writeBatch(db());
+        messages.docs.slice(i, i + 400).forEach((d) => batch.delete(d.ref));
+        await batch.commit();
+      }
+
+      await deleteDoc(doc(db(), 'conversations', conversationId));
+    } catch (error) {
+      console.error('[chat] delete conversation failed:', error);
+      throw error;
+    }
   }
 
   dispose() {

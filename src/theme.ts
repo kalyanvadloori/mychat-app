@@ -29,6 +29,9 @@ export const ACCENT_2 = '#8B5CF6';
 
 export const ACCENT_GRADIENT = `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_2} 100%)`;
 
+/** The mark inside the app logo tile, shown on the sidebar and the login screen. */
+export const BRAND_MARK = 'VK';
+
 /** Deterministic gradient per user id, so avatars look intentional without image assets. */
 const AVATAR_GRADIENTS = [
   'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',

@@ -1,6 +1,12 @@
 import { useMemo, useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogTitle from '@mui/material/DialogTitle';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import List from '@mui/material/List';
@@ -16,13 +22,15 @@ import Typography from '@mui/material/Typography';
 import { useColorScheme } from '@mui/material/styles';
 import AddCommentRoundedIcon from '@mui/icons-material/AddCommentRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
+import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
+import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
-import { ACCENT_GRADIENT, tintPrimary, tintText } from '../theme';
+import { ACCENT_GRADIENT, BRAND_MARK, tintPrimary, tintText } from '../theme';
 import type { Conversation, User } from '../types';
 import { shortStamp } from '../utils/format';
 import UserAvatar from './UserAvatar';
@@ -33,7 +41,10 @@ interface Props {
   selectedId: string | null;
   onSelect: (conversationId: string) => void;
   currentUser: User;
+  /** Everyone registered on the app, including the current user. */
+  peopleCount: number;
   onNewChat: () => void;
+  onDeleteConversation: (conversationId: string) => void;
   /** Only provided when running on the Firebase backend. */
   onSignOut?: () => void;
 }
@@ -44,11 +55,15 @@ export default function Sidebar({
   selectedId,
   onSelect,
   currentUser,
+  peopleCount,
   onNewChat,
+  onDeleteConversation,
   onSignOut,
 }: Props) {
   const [query, setQuery] = useState('');
   const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null);
+  const [rowMenu, setRowMenu] = useState<{ el: HTMLElement; id: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Conversation | null>(null);
   const { mode, systemMode, setMode } = useColorScheme();
   const isDark = (mode === 'system' ? systemMode : mode) === 'dark';
 
@@ -70,22 +85,33 @@ export default function Sidebar({
     <Stack sx={{ height: '100%', minHeight: 0, minWidth: 0 }}>
       <Box sx={{ px: { xs: 1.75, md: 2.5 }, pt: 2.5, pb: 1.5, minWidth: 0 }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <Box
-            sx={{
-              width: 38,
-              height: 38,
-              borderRadius: '12px',
-              background: ACCENT_GRADIENT,
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 18,
-              flexShrink: 0,
-            }}
-          >
-            M
-          </Box>
+          <Tooltip title={`${peopleCount} ${peopleCount === 1 ? 'person has' : 'people have'} signed up`}>
+            <Badge
+              badgeContent={peopleCount}
+              max={999}
+              color="secondary"
+              overlap="circular"
+              anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+              sx={{ flexShrink: 0, '& .MuiBadge-badge': { fontSize: 10, height: 18, minWidth: 18 } }}
+            >
+              <Box
+                sx={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: '12px',
+                  background: ACCENT_GRADIENT,
+                  display: 'grid',
+                  placeItems: 'center',
+                  color: '#fff',
+                  fontWeight: 800,
+                  fontSize: 15,
+                  letterSpacing: '-0.02em',
+                }}
+              >
+                {BRAND_MARK}
+              </Box>
+            </Badge>
+          </Tooltip>
           <Box sx={{ minWidth: 0, flex: 1 }}>
             <Typography variant="subtitle1" noWrap>
               Messages
@@ -222,6 +248,19 @@ export default function Sidebar({
                   <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
                     {last ? shortStamp(last.createdAt) : ''}
                   </Typography>
+                  <Tooltip title="Chat options">
+                    <IconButton
+                      size="small"
+                      // Stop the row underneath from opening the conversation.
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setRowMenu({ el: event.currentTarget, id: conversation.id });
+                      }}
+                      sx={{ p: 0.25, ml: -0.25, mr: -0.75, color: 'text.secondary' }}
+                    >
+                      <MoreVertRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
                 </Stack>
 
                 <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, alignItems: 'center' }}>
@@ -255,6 +294,55 @@ export default function Sidebar({
           );
         })}
       </List>
+
+      <Menu
+        anchorEl={rowMenu?.el ?? null}
+        open={Boolean(rowMenu)}
+        onClose={() => setRowMenu(null)}
+        slotProps={{ paper: { sx: { borderRadius: 3, minWidth: 180 } } }}
+      >
+        <MenuItem
+          onClick={() => {
+            const target = conversations.find((c) => c.id === rowMenu?.id) ?? null;
+            setRowMenu(null);
+            setConfirmDelete(target);
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <DeleteOutlineRoundedIcon fontSize="small" sx={{ color: 'error.main' }} />
+          </ListItemIcon>
+          Delete chat
+        </MenuItem>
+      </Menu>
+
+      <Dialog
+        open={Boolean(confirmDelete)}
+        onClose={() => setConfirmDelete(null)}
+        slotProps={{ paper: { sx: { borderRadius: 4, maxWidth: 380 } } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700 }}>Delete this chat?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            Every message and call record with{' '}
+            <strong>{confirmDelete ? peerOf(confirmDelete).name : ''}</strong> will be permanently
+            deleted for both of you. This cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2.5 }}>
+          <Button onClick={() => setConfirmDelete(null)}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => {
+              if (confirmDelete) onDeleteConversation(confirmDelete.id);
+              setConfirmDelete(null);
+            }}
+          >
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
