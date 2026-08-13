@@ -2,7 +2,9 @@ import {
   Timestamp,
   addDoc,
   collection,
+  deleteField,
   doc,
+  writeBatch,
   increment,
   limitToLast,
   onSnapshot,
@@ -186,6 +188,42 @@ class FirebaseChatService implements ChatService {
       { merge: true },
     );
     return id;
+  }
+
+  /**
+   * A message is safe to remove once the *other* participant has read it — the
+   * person leaving the thread has by definition seen everything in it. Deleting
+   * on "I have seen it" alone would destroy your own messages before the other
+   * side ever received them.
+   */
+  async purgeSeen(conversationId: string) {
+    const data = this.conversationDocs.get(conversationId);
+    const room = this.roomDocs.get(conversationId);
+    const peerId = this.peerIdOf(conversationId);
+    if (!data || !room || !peerId) return;
+
+    const peerReadAt = millis(data.lastReadAt?.[peerId], 0);
+    if (peerReadAt <= 0) return;
+
+    const seen = room.docs.filter(
+      // An unresolved server timestamp means "just now", which is never seen yet.
+      (d) => millis(d.data().createdAt, Number.MAX_SAFE_INTEGER) <= peerReadAt,
+    );
+    if (!seen.length) return;
+
+    const batch = writeBatch(db());
+    seen.forEach((d) => batch.delete(d.ref));
+
+    // Nothing left to show: drop the preview so the thread leaves the sidebar.
+    if (seen.length === room.docs.length) {
+      batch.update(doc(db(), 'conversations', conversationId), {
+        lastMessage: deleteField(),
+        [`unread.${this.me.id}`]: 0,
+        [`unread.${peerId}`]: 0,
+      });
+    }
+
+    await batch.commit();
   }
 
   dispose() {

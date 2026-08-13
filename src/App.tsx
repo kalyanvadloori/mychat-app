@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
@@ -97,6 +97,28 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     if (selectedId && messages.length) service.markRead(selectedId);
   }, [service, selectedId, messages.length]);
 
+  // Read inside callbacks without making them depend on the current selection.
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
+
+  /**
+   * Leaving a thread purges what both people have already seen. Deliberately
+   * driven by this explicit navigation callback rather than an effect cleanup:
+   * StrictMode runs cleanups on its dev-only remount, which would wipe a
+   * conversation the moment you opened it.
+   */
+  const openConversation = useCallback(
+    (id: string | null) => {
+      const previous = selectedIdRef.current;
+      if (previous && previous !== id) void service.purgeSeen(previous);
+      selectedIdRef.current = id;
+      setSelectedId(id);
+    },
+    [service],
+  );
+
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
 
   const peerOf = useCallback(
@@ -109,6 +131,12 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
 
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
+    [conversations, selectedId],
+  );
+
+  // An emptied thread drops out of the list, but never the one currently open.
+  const listed = useMemo(
+    () => conversations.filter((c) => c.lastMessage || c.id === selectedId),
     [conversations, selectedId],
   );
   const peer = selected ? peerOf(selected) : null;
@@ -140,9 +168,9 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const startChatWith = useCallback(
     async (userId: string) => {
       setNewChatOpen(false);
-      setSelectedId(await service.openConversationWith(userId));
+      openConversation(await service.openConversationWith(userId));
     },
-    [service],
+    [service, openConversation],
   );
 
   const showSidebar = isDesktop || !selectedId;
@@ -197,10 +225,10 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
             }}
           >
             <Sidebar
-              conversations={conversations}
+              conversations={listed}
               peerOf={peerOf}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={openConversation}
               currentUser={currentUser}
               onNewChat={() => setNewChatOpen(true)}
               onSignOut={onSignOut}
@@ -217,7 +245,7 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
                   typing={peerTyping}
                   onStartCall={startCall}
                   onToggleProfile={() => setProfileOpen((v) => !v)}
-                  onBack={() => setSelectedId(null)}
+                  onBack={() => openConversation(null)}
                 />
                 <MessageList
                   messages={messages}

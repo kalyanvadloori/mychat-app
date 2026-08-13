@@ -30,6 +30,13 @@ export interface ChatService {
   /** Returns the id of the 1:1 conversation with `peerId`, creating it if needed. */
   openConversationWith(peerId: string): Promise<string>;
 
+  /**
+   * Vanish mode: permanently deletes every message and call record that BOTH
+   * participants have already seen, and clears the conversation preview when
+   * nothing is left. Called when the user leaves an open thread.
+   */
+  purgeSeen(conversationId: string): Promise<void>;
+
   /** True when file attachments can actually be uploaded by this backend. */
   supportsAttachments: boolean;
 

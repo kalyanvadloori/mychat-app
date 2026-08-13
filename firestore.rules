@@ -48,8 +48,11 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 5000;
 
-        // Messages are immutable once sent.
-        allow update, delete: if false;
+        // Messages are immutable once sent...
+        allow update: if false;
+
+        // ...but vanish mode lets either participant delete them once seen.
+        allow delete: if isParticipant(parent());
       }
     }
   }

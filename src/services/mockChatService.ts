@@ -176,6 +176,20 @@ class MockChatService implements ChatService {
     this.publishConversations();
   }
 
+  async purgeSeen(conversationId: string) {
+    // The mock peer reads instantly, so everything currently in the thread counts as seen.
+    const before = this.messages.length;
+    this.messages = this.messages.filter((m) => m.conversationId !== conversationId);
+    if (this.messages.length === before) return;
+
+    const conversation = this.conversations.find((c) => c.id === conversationId);
+    if (conversation) {
+      conversation.lastMessage = undefined;
+      conversation.unreadCount = 0;
+    }
+    this.publish(conversationId);
+  }
+
   async openConversationWith(peerId: string) {
     const existing = this.conversations.find((c) => c.participantIds.includes(peerId));
     if (existing) return existing.id;
