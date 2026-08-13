@@ -156,10 +156,9 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
         position: 'fixed',
         top: 0,
         left: 0,
-        right: 0,
         height: 'var(--app-h, 100dvh)',
-        transform: 'translateY(var(--app-top, 0px))',
-        width: '100%',
+        width: 'var(--app-w, 100%)',
+        transform: 'translate(var(--app-left, 0px), var(--app-top, 0px))',
         maxWidth: '100vw',
         overflow: 'hidden',
         // On phones the shell goes edge to edge, but must clear the notch and home bar.

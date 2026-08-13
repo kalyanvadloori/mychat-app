@@ -24,7 +24,9 @@ export function useAppHeight() {
     if (!viewport) {
       // Older browsers: dynamic viewport units are the best available answer.
       style.setProperty('--app-h', '100dvh');
+      style.setProperty('--app-w', '100%');
       style.setProperty('--app-top', '0px');
+      style.setProperty('--app-left', '0px');
       return;
     }
 
@@ -34,7 +36,10 @@ export function useAppHeight() {
       // iOS fires a burst of events while the keyboard animates; only the last matters.
       frame = requestAnimationFrame(() => {
         style.setProperty('--app-h', `${Math.round(viewport.height)}px`);
+        style.setProperty('--app-w', `${Math.round(viewport.width)}px`);
         style.setProperty('--app-top', `${Math.round(viewport.offsetTop)}px`);
+        // A zoomed viewport is also scrolled sideways; follow it or the edges clip.
+        style.setProperty('--app-left', `${Math.round(viewport.offsetLeft)}px`);
       });
     };
 

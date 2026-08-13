@@ -154,7 +154,9 @@ export default function Composer({
                 send();
               }
             }}
-            sx={{ px: 1, py: 0.75, fontSize: 14.5, minWidth: 0, flex: 1 }}
+            // Must stay at 16px on phones: iOS zooms the page when a focused
+            // field is smaller, which shrinks the viewport and clips the layout.
+            sx={{ px: 1, py: 0.75, fontSize: { xs: 16, md: 14.5 }, minWidth: 0, flex: 1 }}
           />
 
           {canSend ? (

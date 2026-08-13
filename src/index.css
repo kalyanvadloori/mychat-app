@@ -18,6 +18,8 @@ body {
   inset: 0;
   width: 100%;
   -webkit-text-size-adjust: 100%;
+  /* Removes the double-tap-to-zoom gesture, and with it the 300ms tap delay. */
+  touch-action: manipulation;
 }
 
 *,
