@@ -30,7 +30,7 @@ export const ACCENT_2 = '#8B5CF6';
 export const ACCENT_GRADIENT = `linear-gradient(135deg, ${ACCENT} 0%, ${ACCENT_2} 100%)`;
 
 /** The mark inside the app logo tile, shown on the sidebar and the login screen. */
-export const BRAND_MARK = 'VK';
+export const BRAND_MARK = 'KV';
 
 /**
  * One easing curve for everything that moves, so the whole app feels like a
