@@ -75,14 +75,18 @@ export default function LoginScreen() {
                 width: 62,
                 height: 62,
                 borderRadius: '19px',
-                background: ACCENT_GRADIENT,
+                // Deeper than the app-wide accent: sitting in the night sky, a
+                // bright tile would flatten into the glow around it.
+                background: 'linear-gradient(135deg, #4338CA 0%, #6D28D9 100%)',
                 display: 'grid',
                 placeItems: 'center',
                 color: '#fff',
                 fontWeight: 800,
                 fontSize: 24,
                 letterSpacing: '-0.03em',
-                boxShadow: '0 18px 40px -14px rgba(99,102,241,0.95)',
+                border: '1px solid rgba(255,255,255,0.14)',
+                boxShadow:
+                  '0 18px 40px -14px rgba(76,29,149,0.95), inset 0 1px 0 rgba(255,255,255,0.16)',
                 // Lands a beat after the card, so the eye follows it in.
                 animation: `appPop 520ms ${EASE_SPRING} 120ms both`,
               }}

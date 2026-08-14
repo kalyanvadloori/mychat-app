@@ -71,6 +71,18 @@ export default function LogoOrbit({ children, size = 190 }: Props) {
         },
       }}
     >
+      {/* Night sky the orbits sit in. Without it the rings and stars have nothing
+          to read against on the light card — glow needs darkness to be glow. */}
+      <Box
+        sx={{
+          position: 'absolute',
+          inset: 0,
+          borderRadius: '50%',
+          background:
+            'radial-gradient(circle, #070B18 0%, #0B1024 42%, rgba(11,16,36,0.72) 62%, rgba(11,16,36,0) 76%)',
+        }}
+      />
+
       {/* Atmospheric halo behind everything */}
       <Box
         sx={{
