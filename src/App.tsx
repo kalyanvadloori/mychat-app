@@ -16,10 +16,11 @@ import Composer from './components/Composer';
 import LoginScreen from './components/LoginScreen';
 import MessageList from './components/MessageList';
 import NewChatDialog from './components/NewChatDialog';
+import NightWeather from './components/NightWeather';
 import ProfilePanel from './components/ProfilePanel';
 import Sidebar from './components/Sidebar';
 import { disposeChatService, getChatService } from './services';
-import { ACCENT_GRADIENT, tintPrimary, tintSecondary } from './theme';
+import { ACCENT_GRADIENT, EASE, EASE_SPRING, tintPrimary, tintSecondary } from './theme';
 import type { Call, CallKind, Conversation, Message, User } from './types';
 
 /** Placeholder for a participant whose profile doc has not loaded yet. */
@@ -243,6 +244,7 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
           border: '1px solid',
           borderColor: 'divider',
           boxShadow: { xs: 'none', md: '0 30px 70px -40px rgba(15,23,42,0.55)' },
+          animation: `appFadeUp 420ms ${EASE} both`,
         }}
       >
         {showSidebar && (
@@ -304,6 +306,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
         )}
       </Paper>
 
+      <NightWeather />
+
       <NewChatDialog
         open={newChatOpen}
         users={users.filter((u) => u.id !== currentUser.id)}
@@ -354,12 +358,22 @@ function EmptyState({ onNewChat }: { onNewChat: () => void }) {
           color: '#fff',
           cursor: 'pointer',
           boxShadow: '0 20px 40px -18px rgba(99,102,241,0.8)',
+          // Idles gently so the empty screen still feels alive.
+          animation: `appPop 480ms ${EASE_SPRING} both, appFloat 4.5s ease-in-out 600ms infinite`,
+          transition: `transform 200ms ${EASE_SPRING}`,
+          '&:hover': { transform: 'scale(1.06)' },
         }}
       >
         <ForumRoundedIcon sx={{ fontSize: 40 }} />
       </Box>
-      <Typography variant="h6">Select a conversation</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 320 }}>
+      <Typography variant="h6" sx={{ animation: `appFadeUp 420ms ${EASE} 140ms both` }}>
+        Select a conversation
+      </Typography>
+      <Typography
+        variant="body2"
+        color="text.secondary"
+        sx={{ textAlign: 'center', maxWidth: 320, animation: `appFadeUp 420ms ${EASE} 220ms both` }}
+      >
         Pick someone from the list to start chatting, or place a video call straight from the chat
         header.
       </Typography>

@@ -10,7 +10,7 @@ import CallMadeRoundedIcon from '@mui/icons-material/CallMadeRounded';
 import CallReceivedRoundedIcon from '@mui/icons-material/CallReceivedRounded';
 import CallRoundedIcon from '@mui/icons-material/CallRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
-import { ACCENT_GRADIENT, tintText } from '../theme';
+import { ACCENT_GRADIENT, EASE, tintText } from '../theme';
 import type { CallLog, Message, User } from '../types';
 import { callDetail, callHeadline, callIsNegative } from '../utils/call';
 import { formatBytes, timeOf } from '../utils/format';
@@ -121,9 +121,14 @@ export default function MessageBubble({
                 ...t.applyStyles('dark', { backgroundColor: alpha('#FFFFFF', 0.11) }),
               }),
           boxShadow: mine ? '0 6px 18px -8px rgba(99,102,241,0.65)' : 'none',
-          animation: 'bubbleIn 180ms ease-out',
+          // Bubbles arrive from the side they belong to, which reads as movement
+          // toward you or away from you rather than a generic fade.
+          animation: `bubbleIn 260ms ${EASE} both`,
           '@keyframes bubbleIn': {
-            from: { opacity: 0, transform: 'translateY(6px) scale(0.98)' },
+            from: {
+              opacity: 0,
+              transform: `translate(${mine ? '12px' : '-12px'}, 8px) scale(0.94)`,
+            },
             to: { opacity: 1, transform: 'none' },
           },
         })}

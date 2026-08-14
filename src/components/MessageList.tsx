@@ -3,7 +3,7 @@ import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
-import { tintText } from '../theme';
+import { EASE, tintText } from '../theme';
 import type { Message, User } from '../types';
 import { dayLabel } from '../utils/format';
 import MessageBubble from './MessageBubble';
@@ -48,7 +48,8 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
         backgroundSize: '22px 22px',
       }}
     >
-      <Stack sx={{ maxWidth: 900, mx: 'auto', minWidth: 0 }}>
+      {/* Keyed by peer so switching conversation replays the entrance. */}
+      <Stack key={peer.id} sx={{ maxWidth: 900, mx: 'auto', minWidth: 0 }}>
         {messages.map((message, index) => {
           const previous = messages[index - 1];
           const next = messages[index + 1];
@@ -60,7 +61,13 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
           return (
             <Box key={message.id}>
               {newDay && (
-                <Divider sx={{ my: 2.5, '&::before, &::after': { borderColor: 'divider' } }}>
+                <Divider
+                  sx={{
+                    my: 2.5,
+                    animation: `appFadeIn 320ms ${EASE} both`,
+                    '&::before, &::after': { borderColor: 'divider' },
+                  }}
+                >
                   <Chip
                     label={dayLabel(message.createdAt)}
                     size="small"

@@ -7,7 +7,7 @@ import Paper from '@mui/material/Paper';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
-import { ACCENT_GRADIENT, tintPaper } from '../theme';
+import { ACCENT_GRADIENT, EASE, EASE_SPRING, tintPaper, tintPrimary } from '../theme';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
@@ -87,7 +87,7 @@ export default function Composer({
                 onDelete={() =>
                   setAttachments((prev) => prev.filter((a) => a.id !== attachment.id))
                 }
-                sx={{ maxWidth: 260 }}
+                sx={{ maxWidth: 260, animation: `appPop 260ms ${EASE} both` }}
               />
             ))}
           </Stack>
@@ -106,6 +106,12 @@ export default function Composer({
             bgcolor: (t) => tintPaper(t, 0.95),
             backdropFilter: 'blur(8px)',
             WebkitBackdropFilter: 'blur(8px)',
+            transition: `border-color 220ms ease, box-shadow 220ms ${EASE}`,
+            // Lifts toward you as soon as the caret lands in the field.
+            '&:focus-within': {
+              borderColor: 'primary.main',
+              boxShadow: (t) => `0 0 0 4px ${tintPrimary(t, 0.16)}`,
+            },
           }}
         >
           <Tooltip title="Emoji">
@@ -169,6 +175,9 @@ export default function Composer({
                   width: 42,
                   height: 42,
                   flexShrink: 0,
+                  boxShadow: '0 8px 20px -10px rgba(99,102,241,0.95)',
+                  // Springs in the moment there is something worth sending.
+                  animation: `appPop 280ms ${EASE_SPRING} both`,
                   '&:hover': { background: ACCENT_GRADIENT, filter: 'brightness(1.08)' },
                 }}
               >

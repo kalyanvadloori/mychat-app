@@ -30,7 +30,7 @@ import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
-import { ACCENT_GRADIENT, BRAND_MARK, tintPrimary, tintText } from '../theme';
+import { ACCENT_GRADIENT, BRAND_MARK, EASE, EASE_SPRING, tintPrimary, tintText } from '../theme';
 import type { Conversation, User } from '../types';
 import { shortStamp } from '../utils/format';
 import UserAvatar from './UserAvatar';
@@ -209,7 +209,7 @@ export default function Sidebar({
           </Stack>
         )}
 
-        {filtered.map((conversation) => {
+        {filtered.map((conversation, index) => {
           const peer = peerOf(conversation);
           const selected = conversation.id === selectedId;
           const last = conversation.lastMessage;
@@ -221,11 +221,30 @@ export default function Sidebar({
               selected={selected}
               onClick={() => onSelect(conversation.id)}
               sx={{
+                position: 'relative',
+                overflow: 'hidden',
                 px: 1.5,
                 py: 1.25,
                 mb: 0.5,
                 alignItems: 'flex-start',
                 gap: 1.5,
+                // Rows cascade in rather than appearing all at once. Capped so a
+                // long list never leaves the last row waiting.
+                animation: `appFadeUp 300ms ${EASE} both`,
+                animationDelay: `${Math.min(index, 10) * 26}ms`,
+                // Accent bar that grows out of the left edge when selected.
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  top: '50%',
+                  width: 3,
+                  height: selected ? 26 : 0,
+                  borderRadius: 3,
+                  background: ACCENT_GRADIENT,
+                  transform: 'translateY(-50%)',
+                  transition: `height 260ms ${EASE_SPRING}`,
+                },
                 '&.Mui-selected': {
                   bgcolor: (t) => tintPrimary(t, 0.14),
                   '&:hover': { bgcolor: (t) => tintPrimary(t, 0.2) },
@@ -285,7 +304,14 @@ export default function Sidebar({
                     <Badge
                       badgeContent={conversation.unreadCount}
                       color="primary"
-                      sx={{ mr: 1.25, '& .MuiBadge-badge': { position: 'static', transform: 'none' } }}
+                      sx={{
+                        mr: 1.25,
+                        '& .MuiBadge-badge': {
+                          position: 'static',
+                          transform: 'none',
+                          animation: `appPop 320ms ${EASE_SPRING} both`,
+                        },
+                      }}
                     />
                   )}
                 </Stack>
