@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import Box from '@mui/material/Box';
 import Dialog from '@mui/material/Dialog';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -9,6 +10,7 @@ import ListItemText from '@mui/material/ListItemText';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import { tintPaper, tintText } from '../theme';
 import type { User } from '../types';
 import { lastSeenLabel } from '../utils/format';
 import UserAvatar from './UserAvatar';
@@ -62,7 +64,38 @@ export default function NewChatDialog({ open, users, onClose, onSelect }: Props)
             No one else has signed up yet. Register a second account in another browser to chat.
           </Typography>
         ) : (
-          <List sx={{ maxHeight: 380, overflowY: 'auto' }}>
+          <Box
+            sx={{
+              position: 'relative',
+              // A soft fade at the bottom edge says "there is more" on iOS, where
+              // scrollbars are invisible until you are already scrolling.
+              '&::after': {
+                content: '""',
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 28,
+                pointerEvents: 'none',
+                background: (t) =>
+                  `linear-gradient(to top, ${tintPaper(t, 1)} 0%, ${tintPaper(t, 0)} 100%)`,
+              },
+            }}
+          >
+            <List
+              sx={{
+                maxHeight: { xs: '52vh', sm: 380 },
+                overflowY: 'auto',
+                WebkitOverflowScrolling: 'touch',
+                // Keeps a visible track on platforms that allow styling it.
+                '&::-webkit-scrollbar': { width: 6 },
+                '&::-webkit-scrollbar-thumb': {
+                  borderRadius: 6,
+                  bgcolor: (t) => tintText(t, 0.28),
+                },
+                scrollbarWidth: 'thin',
+              }}
+            >
             {filtered.map((user) => (
               <ListItemButton
                 key={user.id}
@@ -77,7 +110,8 @@ export default function NewChatDialog({ open, users, onClose, onSelect }: Props)
                 />
               </ListItemButton>
             ))}
-          </List>
+            </List>
+          </Box>
         )}
       </DialogContent>
     </Dialog>
