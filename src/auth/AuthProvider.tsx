@@ -25,7 +25,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       enabled: isFirebaseConfigured,
 
       async signInWithGoogle() {
-        await signInWithPopup(auth(), new GoogleAuthProvider());
+        const provider = new GoogleAuthProvider();
+        // Signing out of Firebase does not sign you out of Google, so without
+        // this Google silently reuses the last account and skips the chooser.
+        provider.setCustomParameters({ prompt: 'select_account' });
+        await signInWithPopup(auth(), provider);
       },
 
       async logout() {
