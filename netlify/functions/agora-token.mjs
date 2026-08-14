@@ -1,4 +1,9 @@
-import { RtcRole, RtcTokenBuilder } from 'agora-token';
+// `agora-token` is CommonJS, and Node cannot reliably detect its named exports
+// from an ESM file — importing them directly yields `undefined` at runtime.
+// Taking the default export and destructuring it is the interop that works.
+import agoraToken from 'agora-token';
+
+const { RtcRole, RtcTokenBuilder } = agoraToken;
 
 /**
  * Mints short-lived Agora tokens.
@@ -67,8 +72,9 @@ export async function handler(event) {
   const firebaseUid = await verifyFirebaseUser(idToken, firebaseApiKey);
   if (!firebaseUid) return json(401, { error: 'Invalid credentials.' });
 
-  const expiresAt = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
-
+  // Both arguments are durations in seconds from now, NOT absolute timestamps —
+  // passing an epoch here asks for a privilege expiring decades away, which
+  // Agora rejects as malformed.
   const token = RtcTokenBuilder.buildTokenWithUid(
     appId,
     certificate,
@@ -76,8 +82,11 @@ export async function handler(event) {
     uid,
     RtcRole.PUBLISHER,
     TOKEN_TTL_SECONDS,
-    expiresAt,
+    TOKEN_TTL_SECONDS,
   );
 
-  return json(200, { token, expiresAt });
+  return json(200, {
+    token,
+    expiresAt: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS,
+  });
 }
