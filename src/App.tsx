@@ -274,6 +274,19 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     });
   }, [service]);
 
+  /**
+   * Fires on every remote-participant update, so it must be idempotent — an
+   * unguarded version restarted the duration timer each time and handed the
+   * join effect a new call object to react to.
+   */
+  const markCallConnected = useCallback(() => {
+    setCall((prev) =>
+      prev && prev.state !== 'connected'
+        ? { ...prev, state: 'connected', startedAt: Date.now() }
+        : prev,
+    );
+  }, []);
+
   const declineCall = useCallback(() => {
     setCall((prev) => {
       if (prev) void service.setCallStatus(prev.conversationId, 'declined');
@@ -495,9 +508,7 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
         onEnd={endCall}
         onAccept={acceptCall}
         onDecline={declineCall}
-        onConnected={() =>
-          setCall((prev) => (prev ? { ...prev, state: 'connected', startedAt: Date.now() } : prev))
-        }
+        onConnected={markCallConnected}
       />
 
       <Snackbar

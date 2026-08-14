@@ -77,7 +77,6 @@ export default function CallOverlay({ call, onEnd, onAccept, onDecline, onConnec
 
     joinCall({
       channel: call.conversationId,
-      uid: call.selfId,
       video: call.kind === 'video',
       onRemoteUsers,
       onPeerLeft: onEnd,
@@ -210,12 +209,29 @@ export default function CallOverlay({ call, onEnd, onAccept, onDecline, onConnec
                   {incoming && `Incoming ${call.kind} call`}
                   {connected && callDuration(call.startedAt, nowMs)}
                 </Typography>
-                {error && (
-                  <Typography variant="caption" sx={{ color: '#FCA5A5', maxWidth: 320, textAlign: 'center' }}>
-                    {error}
-                  </Typography>
-                )}
               </Stack>
+            )}
+
+            {/* Sits above the remote tile: a failure must never be invisible. */}
+            {error && (
+              <Typography
+                variant="caption"
+                sx={{
+                  position: 'absolute',
+                  top: 'calc(16px + env(safe-area-inset-top))',
+                  left: 16,
+                  right: 16,
+                  zIndex: 3,
+                  px: 2,
+                  py: 1,
+                  borderRadius: 3,
+                  textAlign: 'center',
+                  color: '#FEE2E2',
+                  bgcolor: alpha('#7F1D1D', 0.85),
+                }}
+              >
+                {error}
+              </Typography>
             )}
 
             {/* Self-view */}

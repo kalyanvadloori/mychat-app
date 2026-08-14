@@ -9,12 +9,17 @@ import { auth } from './firebase';
 export const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID ?? '';
 export const isAgoraConfigured = Boolean(AGORA_APP_ID);
 
-/** Agora wants a numeric uid; Firebase gives a string. Hash it, stably. */
-export function numericUid(uid: string) {
-  let hash = 0;
-  for (let i = 0; i < uid.length; i += 1) hash = (hash * 31 + uid.charCodeAt(i)) | 0;
-  // Agora reserves 0 for "assign me one", so keep it strictly positive.
-  return (Math.abs(hash) % 1_000_000_000) + 1;
+/**
+ * A fresh uid for every join, rather than one derived from the account.
+ *
+ * Agora allows a uid in a channel exactly once: a second client joining with the
+ * same uid *evicts the first*. Deriving the uid from the user id meant the same
+ * account on two devices — or any hash collision — silently kicked the other
+ * participant a second or two after connecting.
+ */
+function sessionUid() {
+  // 0 is reserved by Agora for "assign one for me", so stay strictly positive.
+  return Math.floor(Math.random() * 1_000_000_000) + 1;
 }
 
 /**
@@ -38,9 +43,13 @@ async function fetchToken(channel: string, uid: number) {
       },
       body: JSON.stringify({ channel, uid }),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      console.warn('[call] token endpoint returned', response.status, '— joining without a token');
+      return null;
+    }
     return ((await response.json()) as { token?: string }).token ?? null;
   } catch {
+    console.warn('[call] token endpoint unreachable — joining without a token');
     return null;
   }
 }
@@ -54,7 +63,6 @@ export interface CallSession {
 
 interface JoinOptions {
   channel: string;
-  uid: string;
   video: boolean;
   /** Fires whenever the set of remote participants changes. */
   onRemoteUsers: (users: IAgoraRTCRemoteUser[]) => void;
@@ -69,17 +77,30 @@ interface JoinOptions {
  */
 export async function joinCall({
   channel,
-  uid,
   video,
   onRemoteUsers,
   onPeerLeft,
 }: JoinOptions): Promise<CallSession> {
   const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
   const remotes = new Map<string | number, IAgoraRTCRemoteUser>();
+  let leaveGrace: ReturnType<typeof setTimeout> | null = null;
 
   const publish = () => onRemoteUsers([...remotes.values()]);
 
+  const cancelGrace = () => {
+    if (leaveGrace) clearTimeout(leaveGrace);
+    leaveGrace = null;
+  };
+
+  client.on('user-joined', (user) => {
+    // Present but not yet publishing — enough to cancel a pending hang-up.
+    cancelGrace();
+    if (!remotes.has(user.uid)) remotes.set(user.uid, user);
+    publish();
+  });
+
   client.on('user-published', async (user, mediaType) => {
+    cancelGrace();
     await client.subscribe(user, mediaType);
     if (mediaType === 'audio') user.audioTrack?.play();
     remotes.set(user.uid, user);
@@ -94,10 +115,17 @@ export async function joinCall({
   client.on('user-left', (user) => {
     remotes.delete(user.uid);
     publish();
-    if (remotes.size === 0) onPeerLeft();
+    if (remotes.size > 0) return;
+
+    // A brief reconnect looks identical to a hang-up at this instant, so wait
+    // before tearing the call down; user-joined above cancels the timer.
+    cancelGrace();
+    leaveGrace = setTimeout(onPeerLeft, 3000);
   });
 
-  const numeric = numericUid(uid);
+  client.on('exception', (event) => console.warn('[call] agora exception', event));
+
+  const numeric = sessionUid();
   const token = await fetchToken(channel, numeric);
 
   let micTrack: IMicrophoneAudioTrack | null = null;
@@ -126,6 +154,7 @@ export async function joinCall({
     micTrack,
     cameraTrack,
     leave: async () => {
+      cancelGrace();
       micTrack?.stop();
       micTrack?.close();
       cameraTrack?.stop();
