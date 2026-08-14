@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
+import LogoOrbit from './LogoOrbit';
 import { ACCENT_GRADIENT, BRAND_MARK, EASE, EASE_SPRING, tintPrimary, tintSecondary } from '../theme';
 
 /** Google is the only sign-in method: no passwords to choose, forget or leak. */
@@ -67,26 +68,28 @@ export default function LoginScreen() {
           animation: `appFadeUp 480ms ${EASE} both`,
         }}
       >
-        <Stack spacing={1} sx={{ alignItems: 'center', mb: 4 }}>
-          <Box
-            sx={{
-              width: 54,
-              height: 54,
-              borderRadius: '17px',
-              background: ACCENT_GRADIENT,
-              display: 'grid',
-              placeItems: 'center',
-              color: '#fff',
-              fontWeight: 800,
-              fontSize: 21,
-              letterSpacing: '-0.02em',
-              boxShadow: '0 18px 36px -18px rgba(99,102,241,0.9)',
-              // Lands a beat after the card, so the eye follows it in.
-              animation: `appPop 520ms ${EASE_SPRING} 120ms both`,
-            }}
-          >
-            {BRAND_MARK}
-          </Box>
+        <Stack spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
+          <LogoOrbit size={190}>
+            <Box
+              sx={{
+                width: 62,
+                height: 62,
+                borderRadius: '19px',
+                background: ACCENT_GRADIENT,
+                display: 'grid',
+                placeItems: 'center',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 24,
+                letterSpacing: '-0.03em',
+                boxShadow: '0 18px 40px -14px rgba(99,102,241,0.95)',
+                // Lands a beat after the card, so the eye follows it in.
+                animation: `appPop 520ms ${EASE_SPRING} 120ms both`,
+              }}
+            >
+              {BRAND_MARK}
+            </Box>
+          </LogoOrbit>
           <Typography
             variant="h5"
             sx={{ fontWeight: 700, textAlign: 'center', animation: `appFadeUp 460ms ${EASE} 200ms both` }}
@@ -139,6 +142,30 @@ export default function LoginScreen() {
           New here? Signing in with Google creates your account automatically.
         </Typography>
       </Paper>
+
+      <Stack
+        spacing={0.25}
+        sx={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          // Clears the home bar on phones.
+          bottom: 'calc(16px + env(safe-area-inset-bottom))',
+          alignItems: 'center',
+          px: 2,
+          animation: `appFadeIn 600ms ${EASE} 620ms both`,
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center' }}>
+          © {new Date().getFullYear()} Kalyan Vadloori
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ textAlign: 'center', color: 'text.disabled', letterSpacing: '0.01em' }}
+        >
+          Built with React · TypeScript · MUI · Vite · Firebase
+        </Typography>
+      </Stack>
     </Box>
   );
 }
