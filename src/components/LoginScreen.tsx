@@ -5,6 +5,7 @@ import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
 import LogoOrbit from './LogoOrbit';
@@ -15,6 +16,8 @@ export default function LoginScreen() {
   const { signInWithGoogle } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The orbit is the tallest element, so it is the first thing to give way.
+  const compact = useMediaQuery('(max-height: 760px)');
 
   const signIn = async () => {
     setError(null);
@@ -37,10 +40,18 @@ export default function LoginScreen() {
         height: 'var(--app-h, 100dvh)',
         width: 'var(--app-w, 100%)',
         transform: 'translate(var(--app-left, 0px), var(--app-top, 0px))',
-        display: 'grid',
-        placeItems: 'center',
-        p: 2,
+        // Column flow rather than centring both children independently: the card
+        // takes the space it needs, the footer takes the rest, nothing overlaps.
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        px: 2,
+        py: 2,
         overflowY: 'auto',
+        // A scrollbar on a screen this small reads as a layout bug; the content
+        // fits, and the scroll stays available for very short windows.
+        scrollbarWidth: 'none',
+        '&::-webkit-scrollbar': { display: 'none' },
         bgcolor: 'background.default',
         // The wash sits on its own layer so it can drift without repainting the card.
         '&::before': {
@@ -60,7 +71,9 @@ export default function LoginScreen() {
           position: 'relative',
           width: '100%',
           maxWidth: 400,
-          p: { xs: 3, sm: 4.5 },
+          // Centres in the leftover space without pushing the footer off-screen.
+          my: 'auto',
+          p: { xs: 2.5, sm: 4.5 },
           borderRadius: 5,
           border: '1px solid',
           borderColor: 'divider',
@@ -69,7 +82,7 @@ export default function LoginScreen() {
         }}
       >
         <Stack spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
-          <LogoOrbit size={190}>
+          <LogoOrbit size={compact ? 148 : 190}>
             <Box
               sx={{
                 width: 62,
@@ -150,12 +163,11 @@ export default function LoginScreen() {
       <Stack
         spacing={0.25}
         sx={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          // Clears the home bar on phones.
-          bottom: 'calc(16px + env(safe-area-inset-bottom))',
+          flexShrink: 0,
           alignItems: 'center',
+          pt: 3,
+          // Clears the home bar on phones.
+          pb: 'env(safe-area-inset-bottom)',
           px: 2,
           animation: `appFadeIn 600ms ${EASE} 620ms both`,
         }}
