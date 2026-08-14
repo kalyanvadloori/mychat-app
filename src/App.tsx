@@ -161,6 +161,11 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   // Read at notification time, so the effect need not depend on either.
   const userMapRef = useRef<Map<string, User>>(new Map());
   const openConversationRef = useRef<(id: string | null) => void>(() => {});
+  // Call signalling arrives asynchronously and must see current values without
+  // re-subscribing every time a conversation or the peer list changes.
+  const callRef = useRef<Call | null>(null);
+  const conversationsRef = useRef<Conversation[]>([]);
+  const peerOfRef = useRef<(conversation: Conversation) => User>(() => UNKNOWN);
   useEffect(() => {
     if (!conversations.length) return;
 
@@ -201,6 +206,11 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     openConversationRef.current = openConversation;
   }, [userMap, openConversation]);
 
+  useEffect(() => {
+    callRef.current = call;
+    conversationsRef.current = conversations;
+  }, [call, conversations]);
+
   const peerOf = useCallback(
     (conversation: Conversation) => {
       const peerId = conversation.participantIds.find((p) => p !== currentUser.id);
@@ -208,6 +218,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     },
     [currentUser.id, userMap],
   );
+
+  peerOfRef.current = peerOf;
 
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
@@ -224,16 +236,33 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const startCall = useCallback(
     (kind: CallKind) => {
       if (!peer || !selected) return;
-      setCall({ conversationId: selected.id, peer, kind, state: 'ringing' });
+      setCall({
+        conversationId: selected.id,
+        selfId: currentUser.id,
+        peer,
+        kind,
+        state: 'ringing',
+        outgoing: true,
+      });
+      // Agora carries the media but cannot ring anyone; the invitation is ours.
+      void service.ringCall(selected.id, kind).catch(() => {
+        setNotice('Could not start the call.');
+        setCall(null);
+      });
     },
-    [peer, selected],
+    [peer, selected, currentUser.id, service],
   );
 
-  /** Every call leaves a record in the thread, connected or not. */
+  /** Ends or cancels the call and leaves a record of it in the thread. */
   const endCall = useCallback(() => {
     setCall((prev) => {
-      if (prev) {
-        const connected = prev.state === 'connected';
+      if (!prev) return null;
+
+      void service.setCallStatus(prev.conversationId, 'ended');
+
+      const connected = prev.state === 'connected';
+      // Only the caller writes the record, or both sides would log the same call.
+      if (prev.outgoing) {
         void service.logCall(prev.conversationId, {
           kind: prev.kind,
           outcome: connected ? 'completed' : 'cancelled',
@@ -244,6 +273,59 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
       return null;
     });
   }, [service]);
+
+  const declineCall = useCallback(() => {
+    setCall((prev) => {
+      if (prev) void service.setCallStatus(prev.conversationId, 'declined');
+      return null;
+    });
+  }, [service]);
+
+  const acceptCall = useCallback(() => {
+    setCall((prev) => {
+      if (!prev) return prev;
+      void service.setCallStatus(prev.conversationId, 'accepted');
+      return { ...prev, state: 'connected', startedAt: Date.now() };
+    });
+  }, [service]);
+
+  /** Incoming invitations, plus the caller's view of a decline or hang-up. */
+  useEffect(
+    () =>
+      service.subscribeCallInvites((invite) => {
+        const current = callRef.current;
+
+        if (!invite) {
+          // The invitation is gone: they declined, hung up, or never answered.
+          if (!current) return;
+          if (current.state === 'ringing' && current.outgoing) {
+            void service.logCall(current.conversationId, {
+              kind: current.kind,
+              outcome: 'declined',
+              durationSec: 0,
+            });
+          }
+          if (current.state !== 'connected') setCall(null);
+          return;
+        }
+
+        // Our own ring, a status change, or we are already busy — nothing to do.
+        if (invite.from === currentUser.id || invite.status !== 'ringing' || current) return;
+
+        const conversation = conversationsRef.current.find((c) => c.id === invite.conversationId);
+        const from = conversation ? peerOfRef.current(conversation) : null;
+        if (!from) return;
+
+        setCall({
+          conversationId: invite.conversationId,
+          selfId: currentUser.id,
+          peer: from,
+          kind: invite.kind,
+          state: 'incoming',
+        });
+      }),
+    [service, currentUser.id],
+  );
 
   const deleteConversation = useCallback(
     async (conversationId: string) => {
@@ -411,6 +493,8 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
       <CallOverlay
         call={call}
         onEnd={endCall}
+        onAccept={acceptCall}
+        onDecline={declineCall}
         onConnected={() =>
           setCall((prev) => (prev ? { ...prev, state: 'connected', startedAt: Date.now() } : prev))
         }

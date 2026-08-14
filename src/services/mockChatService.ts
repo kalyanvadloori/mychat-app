@@ -178,6 +178,19 @@ class MockChatService implements ChatService {
     this.publishConversations();
   }
 
+  async ringCall() {
+    // The mock peer never picks up.
+  }
+
+  async setCallStatus() {
+    // Nothing to signal without a second device.
+  }
+
+  subscribeCallInvites(cb: (invite: null) => void) {
+    cb(null);
+    return () => {};
+  }
+
   setViewing() {
     // Nobody else is looking at a mock thread.
   }

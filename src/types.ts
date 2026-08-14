@@ -59,12 +59,30 @@ export interface Conversation {
 export type CallKind = 'video' | 'audio';
 export type CallState = 'idle' | 'ringing' | 'incoming' | 'connected' | 'ended';
 
-export interface Call {
-  /** Thread the call belongs to, so the history entry lands in the right place. */
+/**
+ * A call invitation, written to the conversation so the other device learns a
+ * call is being offered. Agora carries the media but knows nothing about
+ * ringing — it only connects people who have already joined the same channel.
+ */
+export interface CallInvite {
   conversationId: string;
+  /** Who placed the call. */
+  from: string;
+  kind: CallKind;
+  createdAt: number;
+  status: 'ringing' | 'accepted' | 'declined' | 'ended';
+}
+
+export interface Call {
+  /** Thread the call belongs to; doubles as the Agora channel name. */
+  conversationId: string;
+  /** The signed-in user's id, used to derive a stable Agora uid. */
+  selfId: string;
   peer: User;
   kind: CallKind;
   state: CallState;
+  /** True when we placed the call. Only the caller writes the history record. */
+  outgoing?: boolean;
   /** Set the moment the call connects; drives both the timer and the logged duration. */
   startedAt?: number;
 }

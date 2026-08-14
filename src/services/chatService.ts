@@ -1,4 +1,12 @@
-import type { Attachment, CallLog, Conversation, Message, User } from '../types';
+import type {
+  Attachment,
+  CallInvite,
+  CallKind,
+  CallLog,
+  Conversation,
+  Message,
+  User,
+} from '../types';
 
 export type Unsubscribe = () => void;
 
@@ -23,6 +31,15 @@ export interface ChatService {
   sendMessage(conversationId: string, text: string, attachments?: Attachment[]): Promise<void>;
   /** Appends a call record to the thread. Written by whoever placed the call. */
   logCall(conversationId: string, call: CallLog): Promise<void>;
+
+  // ---- call signalling ---------------------------------------------------
+
+  /** Rings the other person. Agora carries the media; this is the invitation. */
+  ringCall(conversationId: string, kind: CallKind): Promise<void>;
+  /** Moves an invitation to accepted, declined or ended. */
+  setCallStatus(conversationId: string, status: CallInvite['status']): Promise<void>;
+  /** Fires with the live invitation for any of the user's conversations. */
+  subscribeCallInvites(cb: (invite: CallInvite | null) => void): Unsubscribe;
 
   /** Rewrites the text of one of your own messages. */
   editMessage(conversationId: string, messageId: string, text: string): Promise<void>;

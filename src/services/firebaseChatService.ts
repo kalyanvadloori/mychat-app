@@ -21,7 +21,15 @@ import {
 } from 'firebase/firestore';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { db } from '../lib/firebase';
-import type { Attachment, CallLog, Conversation, Message, User } from '../types';
+import type {
+  Attachment,
+  CallInvite,
+  CallKind,
+  CallLog,
+  Conversation,
+  Message,
+  User,
+} from '../types';
 import { callSummary } from '../utils/call';
 import type { ChatService, Unsubscribe } from './chatService';
 
@@ -33,6 +41,8 @@ const MESSAGE_WINDOW = 150;
 /** How often an open thread re-announces itself, and when that goes stale. */
 const VIEWING_HEARTBEAT_MS = 25_000;
 const VIEWING_TTL = 70_000;
+/** After this, an unanswered ring is treated as a missed call. */
+const RING_TIMEOUT = 45_000;
 
 type Listener<T> = (value: T) => void;
 
@@ -200,6 +210,56 @@ class FirebaseChatService implements ChatService {
   private isNewest(conversationId: string, messageId: string) {
     const docs = this.roomDocs.get(conversationId)?.docs ?? [];
     return docs[docs.length - 1]?.id === messageId;
+  }
+
+  // ---- call signalling ---------------------------------------------------
+
+  async ringCall(conversationId: string, kind: CallKind) {
+    await updateDoc(doc(db(), 'conversations', conversationId), {
+      call: {
+        from: this.me.id,
+        kind,
+        status: 'ringing',
+        createdAt: serverTimestamp(),
+      },
+    });
+  }
+
+  async setCallStatus(conversationId: string, status: CallInvite['status']) {
+    // Ended and declined calls clear the invitation outright, so a stale ring can
+    // never resurrect itself on the next snapshot.
+    await updateDoc(
+      doc(db(), 'conversations', conversationId),
+      status === 'accepted' ? { 'call.status': 'accepted' } : { call: deleteField() },
+    ).catch(() => {});
+  }
+
+  subscribeCallInvites(cb: (invite: CallInvite | null) => void) {
+    cb(this.currentInvite());
+    return this.addListener(this.inviteListeners, cb);
+  }
+
+  private inviteListeners = new Set<Listener<CallInvite | null>>();
+
+  /** The one live invitation across all conversations, if any. */
+  private currentInvite(): CallInvite | null {
+    for (const [conversationId, data] of this.conversationDocs) {
+      const call = data.call;
+      if (!call?.status) continue;
+
+      const createdAt = millis(call.createdAt);
+      // A ring older than the timeout is a caller who vanished mid-call.
+      if (call.status === 'ringing' && Date.now() - createdAt > RING_TIMEOUT) continue;
+
+      return {
+        conversationId,
+        from: call.from,
+        kind: call.kind ?? 'video',
+        status: call.status,
+        createdAt,
+      };
+    }
+    return null;
   }
 
   markRead(conversationId: string) {
@@ -465,6 +525,8 @@ class FirebaseChatService implements ChatService {
       snap.forEach((docSnap) => this.conversationDocs.set(docSnap.id, docSnap.data()));
 
       this.conversationListeners.forEach((cb) => cb(this.conversationList()));
+      const invite = this.currentInvite();
+      this.inviteListeners.forEach((cb) => cb(invite));
       // Read receipts and typing live on the conversation doc, so refresh both.
       this.conversationDocs.forEach((_data, id) => {
         this.emitMessages(id);

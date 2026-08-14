@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Fade from '@mui/material/Fade';
 import IconButton from '@mui/material/IconButton';
@@ -8,12 +8,13 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import CallEndRoundedIcon from '@mui/icons-material/CallEndRounded';
-import FlipCameraIosRoundedIcon from '@mui/icons-material/FlipCameraIosRounded';
+import CallRoundedIcon from '@mui/icons-material/CallRounded';
 import MicOffRoundedIcon from '@mui/icons-material/MicOffRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
-import ScreenShareRoundedIcon from '@mui/icons-material/ScreenShareRounded';
 import VideocamOffRoundedIcon from '@mui/icons-material/VideocamOffRounded';
 import VideocamRoundedIcon from '@mui/icons-material/VideocamRounded';
+import type { IAgoraRTCRemoteUser } from 'agora-rtc-sdk-ng';
+import { callErrorMessage, joinCall, type CallSession } from '../lib/agora';
 import { gradientFor } from '../theme';
 import type { Call } from '../types';
 import { callDuration, initials } from '../utils/format';
@@ -21,85 +22,129 @@ import { callDuration, initials } from '../utils/format';
 interface Props {
   call: Call | null;
   onEnd: () => void;
+  onAccept: () => void;
+  onDecline: () => void;
   onConnected: () => void;
 }
 
-/**
- * Call UI running on local media only — the peer tile is a placeholder.
- * Agora's remote track gets rendered into the `remote-video` container in step 3;
- * every control below already maps 1:1 onto an Agora track method.
- */
-export default function CallOverlay({ call, onEnd, onConnected }: Props) {
+export default function CallOverlay({ call, onEnd, onAccept, onDecline, onConnected }: Props) {
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [nowMs, setNowMs] = useState(() => Date.now());
-  const [mediaError, setMediaError] = useState<string | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hasRemoteVideo, setHasRemoteVideo] = useState(false);
 
-  const open = Boolean(call && call.state !== 'idle' && call.state !== 'ended');
-  const connected = call?.state === 'connected';
+  const sessionRef = useRef<CallSession | null>(null);
+  const joiningRef = useRef(false);
+  const localRef = useRef<HTMLDivElement>(null);
+  const remoteRef = useRef<HTMLDivElement>(null);
 
-  // Acquire the local camera/mic for the self-view while a call is open.
+  const state = call?.state;
+  const open = Boolean(call && state !== 'idle' && state !== 'ended');
+  const connected = state === 'connected';
+  const incoming = state === 'incoming';
+  const video = call?.kind === 'video';
+
+  // An incoming call must not touch the camera until it is answered.
+  const shouldJoin = open && !incoming;
+
+  const onRemoteUsers = useCallback(
+    (users: IAgoraRTCRemoteUser[]) => {
+      const peer = users[0];
+      if (!peer) {
+        setHasRemoteVideo(false);
+        return;
+      }
+      // Arrival of the other side is what turns "ringing" into "connected".
+      onConnected();
+      if (peer.videoTrack && remoteRef.current) {
+        peer.videoTrack.play(remoteRef.current);
+        setHasRemoteVideo(true);
+      } else {
+        setHasRemoteVideo(false);
+      }
+    },
+    [onConnected],
+  );
+
   useEffect(() => {
-    if (!open) return;
+    // Guarded by refs, not state: connecting flips the state, and a second join
+    // would drop the first session and restart the call.
+    if (!shouldJoin || !call || sessionRef.current || joiningRef.current) return;
+
+    joiningRef.current = true;
     let cancelled = false;
 
-    navigator.mediaDevices
-      ?.getUserMedia({ video: call?.kind === 'video', audio: true })
-      .then((stream) => {
+    joinCall({
+      channel: call.conversationId,
+      uid: call.selfId,
+      video: call.kind === 'video',
+      onRemoteUsers,
+      onPeerLeft: onEnd,
+    })
+      .then((session) => {
+        joiningRef.current = false;
         if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
+          void session.leave();
           return;
         }
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
+        sessionRef.current = session;
+        if (session.cameraTrack && localRef.current) session.cameraTrack.play(localRef.current);
       })
-      .catch(() => {
-        if (!cancelled) setMediaError('Camera unavailable — showing placeholder');
+      .catch((err) => {
+        joiningRef.current = false;
+        if (!cancelled) setError(callErrorMessage(err));
       });
 
     return () => {
       cancelled = true;
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
     };
-  }, [open, call?.kind]);
+  }, [shouldJoin, call, onRemoteUsers, onEnd]);
 
-  // Simulate the callee picking up.
+  // Tear the session down whenever the call screen closes.
   useEffect(() => {
-    if (call?.state !== 'ringing') return;
-    const t = setTimeout(onConnected, 2600);
-    return () => clearTimeout(t);
-  }, [call?.state, onConnected]);
+    if (open) return;
+    const session = sessionRef.current;
+    sessionRef.current = null;
+    void session?.leave();
+    setMicOn(true);
+    setCamOn(true);
+    setError(null);
+    setHasRemoteVideo(false);
+  }, [open]);
 
-  // Drive the duration readout once connected.
+  // Leave cleanly if the tab is closed mid-call.
+  useEffect(
+    () => () => {
+      void sessionRef.current?.leave();
+      sessionRef.current = null;
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!connected) return;
-    const t = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(timer);
   }, [connected]);
 
-  // Mirror the control state onto the real local tracks.
-  useEffect(() => {
-    streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = micOn));
-    streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = camOn));
-  }, [micOn, camOn]);
+  const toggleMic = () => {
+    const next = !micOn;
+    setMicOn(next);
+    void sessionRef.current?.micTrack?.setEnabled(next);
+  };
 
-  // Reset controls for the next call.
-  useEffect(() => {
-    if (!open) {
-      setMicOn(true);
-      setCamOn(true);
-      setMediaError(null);
-    }
-  }, [open]);
+  const toggleCam = () => {
+    const next = !camOn;
+    setCamOn(next);
+    void sessionRef.current?.cameraTrack?.setEnabled(next);
+  };
 
   if (!call) return null;
   const peer = call.peer;
 
   return (
-    <Modal open={open} onClose={onEnd} closeAfterTransition>
+    <Modal open={open} onClose={incoming ? onDecline : onEnd} closeAfterTransition>
       <Fade in={open}>
         <Box
           sx={{
@@ -111,9 +156,7 @@ export default function CallOverlay({ call, onEnd, onConnected }: Props) {
             outline: 'none',
           }}
         >
-          {/* Remote tile */}
           <Box
-            id="remote-video"
             sx={{
               flex: 1,
               position: 'relative',
@@ -122,47 +165,63 @@ export default function CallOverlay({ call, onEnd, onConnected }: Props) {
               background: `radial-gradient(120% 90% at 50% 0%, ${alpha('#6366F1', 0.35)} 0%, transparent 60%), #0A0C12`,
             }}
           >
-            <Stack spacing={2} sx={{ alignItems: 'center' }}>
-              <Box
-                sx={{
-                  width: 132,
-                  height: 132,
-                  borderRadius: '50%',
-                  background: gradientFor(peer.id),
-                  display: 'grid',
-                  placeItems: 'center',
-                  color: '#fff',
-                  fontSize: 46,
-                  fontWeight: 700,
-                  boxShadow: '0 24px 60px -20px rgba(99,102,241,0.8)',
-                  animation: connected ? 'none' : 'callPulse 1.9s ease-out infinite',
-                  '@keyframes callPulse': {
-                    '0%': { boxShadow: `0 0 0 0 ${alpha('#818CF8', 0.55)}` },
-                    '100%': { boxShadow: `0 0 0 42px ${alpha('#818CF8', 0)}` },
-                  },
-                }}
-              >
-                {initials(peer.name)}
-              </Box>
+            {/* Remote video fills the screen once their track arrives. */}
+            <Box
+              ref={remoteRef}
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                opacity: hasRemoteVideo ? 1 : 0,
+                transition: 'opacity 320ms ease',
+                '& video': { objectFit: 'cover' },
+              }}
+            />
 
-              <Typography variant="h5" sx={{ color: '#fff', fontWeight: 700 }}>
-                {peer.name}
-              </Typography>
-              <Typography sx={{ color: alpha('#fff', 0.7) }}>
-                {call.state === 'ringing' && 'Ringing…'}
-                {call.state === 'incoming' && `Incoming ${call.kind} call`}
-                {connected && callDuration(call.startedAt, nowMs)}
-              </Typography>
-              {mediaError && (
-                <Typography variant="caption" sx={{ color: alpha('#fff', 0.5) }}>
-                  {mediaError}
+            {/* Identity card, shown until there is remote video to replace it. */}
+            {!hasRemoteVideo && (
+              <Stack spacing={2} sx={{ alignItems: 'center', zIndex: 1 }}>
+                <Box
+                  sx={{
+                    width: 132,
+                    height: 132,
+                    borderRadius: '50%',
+                    background: gradientFor(peer.id),
+                    display: 'grid',
+                    placeItems: 'center',
+                    color: '#fff',
+                    fontSize: 46,
+                    fontWeight: 700,
+                    boxShadow: '0 24px 60px -20px rgba(99,102,241,0.8)',
+                    animation: connected ? 'none' : 'callPulse 1.9s ease-out infinite',
+                    '@keyframes callPulse': {
+                      '0%': { boxShadow: `0 0 0 0 ${alpha('#818CF8', 0.55)}` },
+                      '100%': { boxShadow: `0 0 0 42px ${alpha('#818CF8', 0)}` },
+                    },
+                  }}
+                >
+                  {initials(peer.name)}
+                </Box>
+
+                <Typography variant="h5" sx={{ color: '#fff', fontWeight: 700 }}>
+                  {peer.name}
                 </Typography>
-              )}
-            </Stack>
+                <Typography sx={{ color: alpha('#fff', 0.7) }}>
+                  {state === 'ringing' && 'Ringing…'}
+                  {incoming && `Incoming ${call.kind} call`}
+                  {connected && callDuration(call.startedAt, nowMs)}
+                </Typography>
+                {error && (
+                  <Typography variant="caption" sx={{ color: '#FCA5A5', maxWidth: 320, textAlign: 'center' }}>
+                    {error}
+                  </Typography>
+                )}
+              </Stack>
+            )}
 
-            {/* Local self-view */}
-            {call.kind === 'video' && (
+            {/* Self-view */}
+            {video && !incoming && (
               <Box
+                ref={localRef}
                 sx={{
                   position: 'absolute',
                   right: { xs: 16, md: 28 },
@@ -175,111 +234,102 @@ export default function CallOverlay({ call, onEnd, onConnected }: Props) {
                   border: '1px solid',
                   borderColor: alpha('#fff', 0.14),
                   boxShadow: '0 18px 40px -18px rgba(0,0,0,0.9)',
-                  display: 'grid',
-                  placeItems: 'center',
+                  zIndex: 2,
+                  '& video': { objectFit: 'cover' },
                 }}
-              >
-                <Box
-                  component="video"
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  muted
-                  sx={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    transform: 'scaleX(-1)',
-                    display: camOn ? 'block' : 'none',
-                  }}
-                />
-                {!camOn && <VideocamOffRoundedIcon sx={{ color: alpha('#fff', 0.5) }} />}
-              </Box>
+              />
             )}
           </Box>
 
           {/* Controls */}
           <Stack
             direction="row"
-            spacing={{ xs: 1.5, md: 2.5 }}
-            sx={{ py: { xs: 3, md: 4 }, justifyContent: 'center' }}
+            spacing={2}
+            sx={{
+              justifyContent: 'center',
+              alignItems: 'center',
+              py: { xs: 3, md: 4 },
+              pb: 'calc(24px + env(safe-area-inset-bottom))',
+              bgcolor: alpha('#000', 0.35),
+            }}
           >
-            <CallButton
-              label={micOn ? 'Mute' : 'Unmute'}
-              active={!micOn}
-              onClick={() => setMicOn((v) => !v)}
-            >
-              {micOn ? <MicRoundedIcon /> : <MicOffRoundedIcon />}
-            </CallButton>
+            {incoming ? (
+              <>
+                <Tooltip title="Decline">
+                  <IconButton
+                    onClick={onDecline}
+                    sx={{ width: 64, height: 64, bgcolor: '#EF4444', color: '#fff', '&:hover': { bgcolor: '#DC2626' } }}
+                  >
+                    <CallEndRoundedIcon />
+                  </IconButton>
+                </Tooltip>
+                <Tooltip title="Answer">
+                  <IconButton
+                    onClick={onAccept}
+                    sx={{
+                      width: 64,
+                      height: 64,
+                      bgcolor: '#22C55E',
+                      color: '#fff',
+                      '&:hover': { bgcolor: '#16A34A' },
+                      animation: 'callPulse 1.6s ease-out infinite',
+                      '@keyframes callPulse': {
+                        '0%': { boxShadow: `0 0 0 0 ${alpha('#22C55E', 0.6)}` },
+                        '100%': { boxShadow: `0 0 0 28px ${alpha('#22C55E', 0)}` },
+                      },
+                    }}
+                  >
+                    <CallRoundedIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
+            ) : (
+              <>
+                <Tooltip title={micOn ? 'Mute' : 'Unmute'}>
+                  <IconButton
+                    onClick={toggleMic}
+                    sx={{
+                      width: 56,
+                      height: 56,
+                      color: '#fff',
+                      bgcolor: micOn ? alpha('#fff', 0.12) : '#fff',
+                      ...(micOn ? {} : { color: '#0A0C12' }),
+                    }}
+                  >
+                    {micOn ? <MicRoundedIcon /> : <MicOffRoundedIcon />}
+                  </IconButton>
+                </Tooltip>
 
-            <CallButton
-              label={camOn ? 'Turn camera off' : 'Turn camera on'}
-              active={!camOn}
-              onClick={() => setCamOn((v) => !v)}
-            >
-              {camOn ? <VideocamRoundedIcon /> : <VideocamOffRoundedIcon />}
-            </CallButton>
+                {video && (
+                  <Tooltip title={camOn ? 'Turn camera off' : 'Turn camera on'}>
+                    <IconButton
+                      onClick={toggleCam}
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        color: '#fff',
+                        bgcolor: camOn ? alpha('#fff', 0.12) : '#fff',
+                        ...(camOn ? {} : { color: '#0A0C12' }),
+                      }}
+                    >
+                      {camOn ? <VideocamRoundedIcon /> : <VideocamOffRoundedIcon />}
+                    </IconButton>
+                  </Tooltip>
+                )}
 
-            <CallButton label="Share screen" disabled>
-              <ScreenShareRoundedIcon />
-            </CallButton>
-
-            <CallButton label="Switch camera" disabled>
-              <FlipCameraIosRoundedIcon />
-            </CallButton>
-
-            <Tooltip title="End call">
-              <IconButton
-                onClick={onEnd}
-                sx={{
-                  width: 62,
-                  height: 62,
-                  bgcolor: '#EF4444',
-                  color: '#fff',
-                  '&:hover': { bgcolor: '#DC2626' },
-                }}
-              >
-                <CallEndRoundedIcon />
-              </IconButton>
-            </Tooltip>
+                <Tooltip title="End call">
+                  <IconButton
+                    onClick={onEnd}
+                    sx={{ width: 64, height: 64, bgcolor: '#EF4444', color: '#fff', '&:hover': { bgcolor: '#DC2626' } }}
+                  >
+                    <CallEndRoundedIcon />
+                  </IconButton>
+                </Tooltip>
+              </>
+            )}
           </Stack>
         </Box>
       </Fade>
     </Modal>
-  );
-}
-
-function CallButton({
-  children,
-  label,
-  active,
-  disabled,
-  onClick,
-}: {
-  children: React.ReactNode;
-  label: string;
-  active?: boolean;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <Tooltip title={disabled ? `${label} (coming soon)` : label}>
-      <span>
-        <IconButton
-          onClick={onClick}
-          disabled={disabled}
-          sx={{
-            width: 62,
-            height: 62,
-            color: active ? '#0A0C12' : '#fff',
-            bgcolor: active ? '#fff' : alpha('#fff', 0.12),
-            '&:hover': { bgcolor: active ? '#fff' : alpha('#fff', 0.2) },
-            '&.Mui-disabled': { color: alpha('#fff', 0.28), bgcolor: alpha('#fff', 0.06) },
-          }}
-        >
-          {children}
-        </IconButton>
-      </span>
-    </Tooltip>
   );
 }
