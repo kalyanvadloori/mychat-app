@@ -23,7 +23,19 @@ export interface ChatService {
   sendMessage(conversationId: string, text: string, attachments?: Attachment[]): Promise<void>;
   /** Appends a call record to the thread. Written by whoever placed the call. */
   logCall(conversationId: string, call: CallLog): Promise<void>;
+
+  /** Rewrites the text of one of your own messages. */
+  editMessage(conversationId: string, messageId: string, text: string): Promise<void>;
+
+  /** Unsends one of your own messages — it disappears for both people. */
+  deleteMessage(conversationId: string, messageId: string): Promise<void>;
   markRead(conversationId: string): void;
+
+  /**
+   * Announces whether this user currently has the thread open. Vanish mode waits
+   * for both people to leave, so each side needs to know if the other is looking.
+   */
+  setViewing(conversationId: string, viewing: boolean): void;
   setTyping(conversationId: string, typing: boolean): void;
   setMuted(conversationId: string, muted: boolean): void;
 

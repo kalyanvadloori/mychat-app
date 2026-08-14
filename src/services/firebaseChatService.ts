@@ -30,6 +30,9 @@ const PRESENCE_TTL = 2 * 60_000;
 const HEARTBEAT_MS = 60_000;
 /** Newest N messages per conversation — keeps reads inside the free daily quota. */
 const MESSAGE_WINDOW = 150;
+/** How often an open thread re-announces itself, and when that goes stale. */
+const VIEWING_HEARTBEAT_MS = 25_000;
+const VIEWING_TTL = 70_000;
 
 type Listener<T> = (value: T) => void;
 
@@ -62,6 +65,7 @@ class FirebaseChatService implements ChatService {
   private roomUnsubs = new Map<string, Unsubscribe>();
   private rootUnsubs: Unsubscribe[] = [];
   private heartbeat?: ReturnType<typeof setInterval>;
+  private viewingTimer?: ReturnType<typeof setInterval>;
   private lastTypingWrite = new Map<string, boolean>();
 
   constructor(authUser: FirebaseUser) {
@@ -151,6 +155,53 @@ class FirebaseChatService implements ChatService {
     });
   }
 
+  async editMessage(conversationId: string, messageId: string, text: string) {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    await updateDoc(doc(db(), 'conversations', conversationId, 'messages', messageId), {
+      text: trimmed,
+      editedAt: serverTimestamp(),
+    });
+
+    // The sidebar preview is a copy, so it has to be corrected separately.
+    if (this.isNewest(conversationId, messageId)) {
+      await updateDoc(doc(db(), 'conversations', conversationId), {
+        'lastMessage.text': trimmed,
+      }).catch(() => {});
+    }
+  }
+
+  async deleteMessage(conversationId: string, messageId: string) {
+    const wasNewest = this.isNewest(conversationId, messageId);
+    await deleteDoc(doc(db(), 'conversations', conversationId, 'messages', messageId));
+    if (!wasNewest) return;
+
+    // Unsending the newest message leaves the preview pointing at nothing.
+    const remaining = (this.roomDocs.get(conversationId)?.docs ?? []).filter(
+      (d) => d.id !== messageId,
+    );
+    const newest = remaining[remaining.length - 1]?.data();
+
+    await updateDoc(
+      doc(db(), 'conversations', conversationId),
+      newest
+        ? {
+            lastMessage: {
+              text: newest.text ?? '',
+              senderId: newest.senderId,
+              createdAt: newest.createdAt ?? null,
+            },
+          }
+        : { lastMessage: deleteField() },
+    ).catch(() => {});
+  }
+
+  private isNewest(conversationId: string, messageId: string) {
+    const docs = this.roomDocs.get(conversationId)?.docs ?? [];
+    return docs[docs.length - 1]?.id === messageId;
+  }
+
   markRead(conversationId: string) {
     const data = this.conversationDocs.get(conversationId);
     if (!data) return;
@@ -161,6 +212,38 @@ class FirebaseChatService implements ChatService {
       [`unread.${this.me.id}`]: 0,
       [`lastReadAt.${this.me.id}`]: serverTimestamp(),
     });
+  }
+
+  /**
+   * Publishes "I am looking at this thread", refreshed on a timer.
+   *
+   * A timestamp rather than a plain flag, because a closed tab, a dead battery or
+   * lost signal never gets to clear it. Firestore has no disconnect hook, so a
+   * stale heartbeat is the only way to tell a reader from a vanished one.
+   */
+  setViewing(conversationId: string, viewing: boolean) {
+    if (this.viewingTimer) clearInterval(this.viewingTimer);
+    this.viewingTimer = undefined;
+
+    const write = () =>
+      void updateDoc(doc(db(), 'conversations', conversationId), {
+        [`viewing.${this.me.id}`]: viewing,
+        [`viewingAt.${this.me.id}`]: serverTimestamp(),
+      }).catch(() => {});
+
+    write();
+
+    if (viewing) {
+      this.viewingTimer = setInterval(write, VIEWING_HEARTBEAT_MS);
+    }
+  }
+
+  /** True while the other person's heartbeat is both set and recent. */
+  private peerIsViewing(conversationId: string) {
+    const data = this.conversationDocs.get(conversationId);
+    const peerId = this.peerIdOf(conversationId);
+    if (!data || !peerId || data.viewing?.[peerId] !== true) return false;
+    return Date.now() - millis(data.viewingAt?.[peerId], 0) < VIEWING_TTL;
   }
 
   setTyping(conversationId: string, typing: boolean) {
@@ -209,6 +292,10 @@ class FirebaseChatService implements ChatService {
     const peerId = this.peerIdOf(conversationId);
     const data = this.conversationDocs.get(conversationId);
     if (!room?.docs.length || !peerId) return;
+
+    // Whoever leaves last does the cleaning. Deleting while the other person is
+    // still on the screen would empty the thread out from under them.
+    if (this.peerIsViewing(conversationId)) return;
 
     const peerReadAt = millis(data?.lastReadAt?.[peerId], 0);
 
@@ -287,6 +374,7 @@ class FirebaseChatService implements ChatService {
     this.roomUnsubs.forEach((stop) => stop());
     this.roomUnsubs.clear();
     if (this.heartbeat) clearInterval(this.heartbeat);
+    if (this.viewingTimer) clearInterval(this.viewingTimer);
     void setDoc(
       doc(db(), 'users', this.me.id),
       { presence: 'offline', lastSeen: serverTimestamp() },
@@ -426,6 +514,7 @@ class FirebaseChatService implements ChatService {
       senderId: data.senderId,
       text: data.text ?? '',
       call: data.call ?? undefined,
+      editedAt: data.editedAt ? millis(data.editedAt) : undefined,
       createdAt,
       status: !mine
         ? 'read'

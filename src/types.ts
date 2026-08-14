@@ -42,6 +42,8 @@ export interface Message {
   attachments?: Attachment[];
   /** Present when this entry is a call record rather than a typed message. */
   call?: CallLog;
+  /** Set when the sender has changed the text since sending it. */
+  editedAt?: number;
 }
 
 export interface Conversation {

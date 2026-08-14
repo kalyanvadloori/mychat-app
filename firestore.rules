@@ -49,10 +49,16 @@ service cloud.firestore {
           && request.resource.data.text is string
           && request.resource.data.text.size() <= 5000;
 
-        // Messages are immutable once sent...
-        allow update: if false;
+        // Only the author may edit, only the wording, and never the attribution:
+        // rewriting someone else's message or reassigning who sent it stays barred.
+        allow update: if isParticipant(parent())
+          && request.auth.uid == resource.data.senderId
+          && request.resource.data.senderId == resource.data.senderId
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.text is string
+          && request.resource.data.text.size() <= 5000;
 
-        // ...but vanish mode lets either participant delete them once seen.
+        // Vanish mode and "unsend" both delete; either participant may.
         allow delete: if isParticipant(parent());
       }
     }

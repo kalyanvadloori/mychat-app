@@ -14,9 +14,18 @@ interface Props {
   peer: User;
   currentUserId: string;
   peerTyping: boolean;
+  onEditMessage: (message: Message) => void;
+  onUnsendMessage: (message: Message) => void;
 }
 
-export default function MessageList({ messages, peer, currentUserId, peerTyping }: Props) {
+export default function MessageList({
+  messages,
+  peer,
+  currentUserId,
+  peerTyping,
+  onEditMessage,
+  onUnsendMessage,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -85,6 +94,8 @@ export default function MessageList({ messages, peer, currentUserId, peerTyping 
                 currentUserId={currentUserId}
                 startsGroup={startsGroup}
                 endsGroup={endsGroup}
+                onEdit={onEditMessage}
+                onUnsend={onUnsendMessage}
               />
             </Box>
           );

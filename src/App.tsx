@@ -21,6 +21,7 @@ import ProfilePanel from './components/ProfilePanel';
 import Sidebar from './components/Sidebar';
 import { disposeChatService, getChatService } from './services';
 import { ACCENT_GRADIENT, EASE, EASE_SPRING, tintPrimary, tintSecondary } from './theme';
+import { showNotification } from './utils/notify';
 import type { Call, CallKind, Conversation, Message, User } from './types';
 
 /** Placeholder for a participant whose profile doc has not loaded yet. */
@@ -67,6 +68,7 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [call, setCall] = useState<Call | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
 
   const currentUser = service.currentUser();
 
@@ -80,6 +82,7 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
       return;
     }
     service.markRead(selectedId);
+    service.setViewing(selectedId, true);
     const stopMessages = service.subscribeMessages(selectedId, setMessages);
     const stopTyping = service.subscribeTyping(selectedId, setPeerTyping);
     return () => {
@@ -113,8 +116,14 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const openConversation = useCallback(
     (id: string | null) => {
       const previous = selectedIdRef.current;
-      if (previous && previous !== id) void service.purgeSeen(previous);
+      if (previous && previous !== id) {
+        // Stand down first, then purge — the check looks at the *other* person,
+        // and they must see us gone if they are the next to leave.
+        service.setViewing(previous, false);
+        void service.purgeSeen(previous);
+      }
       selectedIdRef.current = id;
+      setEditing(null);
       setSelectedId(id);
     },
     [service],
@@ -127,15 +136,70 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
    */
   useEffect(() => {
     const onHidden = () => {
-      if (document.visibilityState === 'hidden' && selectedIdRef.current) {
-        void service.purgeSeen(selectedIdRef.current);
+      const open = selectedIdRef.current;
+      if (!open) return;
+
+      if (document.visibilityState === 'hidden') {
+        service.setViewing(open, false);
+        void service.purgeSeen(open);
+      } else {
+        // Back on screen and still in the thread: resume announcing.
+        service.setViewing(open, true);
       }
     };
     document.addEventListener('visibilitychange', onHidden);
     return () => document.removeEventListener('visibilitychange', onHidden);
   }, [service]);
 
+  /**
+   * Notifies about incoming messages, driven off the conversation list rather
+   * than the open thread — that is the only stream covering every chat at once.
+   * The first snapshot only seeds the baseline, so signing in never fires a
+   * burst of notifications for messages you already had.
+   */
+  const notifiedAt = useRef<Map<string, number> | null>(null);
+  // Read at notification time, so the effect need not depend on either.
+  const userMapRef = useRef<Map<string, User>>(new Map());
+  const openConversationRef = useRef<(id: string | null) => void>(() => {});
+  useEffect(() => {
+    if (!conversations.length) return;
+
+    const seen = notifiedAt.current;
+    const next = new Map<string, number>();
+    conversations.forEach((c) => next.set(c.id, c.lastMessage?.createdAt ?? 0));
+
+    if (!seen) {
+      notifiedAt.current = next;
+      return;
+    }
+
+    conversations.forEach((conversation) => {
+      const last = conversation.lastMessage;
+      if (!last || last.senderId === currentUser.id || conversation.muted) return;
+      if (last.createdAt <= (seen.get(conversation.id) ?? 0)) return;
+
+      // Silent when you are already looking at that thread.
+      const watching = conversation.id === selectedIdRef.current && !document.hidden;
+      if (watching) return;
+
+      const peerId = conversation.participantIds.find((p) => p !== currentUser.id);
+      showNotification({
+        title: (peerId && userMapRef.current.get(peerId)?.name) || 'New message',
+        body: last.text || 'Sent you a message',
+        tag: conversation.id,
+        onClick: () => openConversationRef.current(conversation.id),
+      });
+    });
+
+    notifiedAt.current = next;
+  }, [conversations, currentUser.id]);
+
   const userMap = useMemo(() => new Map(users.map((u) => [u.id, u])), [users]);
+
+  useEffect(() => {
+    userMapRef.current = userMap;
+    openConversationRef.current = openConversation;
+  }, [userMap, openConversation]);
 
   const peerOf = useCallback(
     (conversation: Conversation) => {
@@ -287,6 +351,16 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
                   peer={peer}
                   currentUserId={currentUser.id}
                   peerTyping={peerTyping}
+                  onEditMessage={(message) =>
+                    setEditing({ id: message.id, text: message.text })
+                  }
+                  onUnsendMessage={(message) => {
+                    if (editing?.id === message.id) setEditing(null);
+                    void service
+                      .deleteMessage(selected.id, message.id)
+                      .then(() => setNotice('Message unsent'))
+                      .catch(() => setNotice('Could not unsend that message.'));
+                  }}
                 />
                 <Composer
                   attachmentsEnabled={service.supportsAttachments}
@@ -297,6 +371,16 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
                     void service.sendMessage(selected.id, text, attachments)
                   }
                   onTyping={(typing) => service.setTyping(selected.id, typing)}
+                  editing={editing}
+                  onCancelEdit={() => setEditing(null)}
+                  onSaveEdit={(text) => {
+                    if (!editing) return;
+                    const { id } = editing;
+                    setEditing(null);
+                    void service
+                      .editMessage(selected.id, id, text)
+                      .catch(() => setNotice('Could not save the edit.'));
+                  }}
                 />
               </>
             ) : (

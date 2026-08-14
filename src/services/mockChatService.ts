@@ -158,11 +158,28 @@ class MockChatService implements ChatService {
     this.publish(conversationId);
   }
 
+  async editMessage(conversationId: string, messageId: string, text: string) {
+    const message = this.messages.find((m) => m.id === messageId);
+    if (!message) return;
+    message.text = text.trim();
+    message.editedAt = Date.now();
+    this.publish(conversationId);
+  }
+
+  async deleteMessage(conversationId: string, messageId: string) {
+    this.messages = this.messages.filter((m) => m.id !== messageId);
+    this.publish(conversationId);
+  }
+
   markRead(conversationId: string) {
     const conversation = this.conversations.find((c) => c.id === conversationId);
     if (!conversation || conversation.unreadCount === 0) return;
     conversation.unreadCount = 0;
     this.publishConversations();
+  }
+
+  setViewing() {
+    // Nobody else is looking at a mock thread.
   }
 
   setTyping() {

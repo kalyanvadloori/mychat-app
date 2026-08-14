@@ -27,12 +27,14 @@ import DoneAllRoundedIcon from '@mui/icons-material/DoneAllRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import MoreVertRoundedIcon from '@mui/icons-material/MoreVertRounded';
+import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsActiveRounded';
 import PushPinRoundedIcon from '@mui/icons-material/PushPinRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import { ACCENT_GRADIENT, BRAND_MARK, EASE, EASE_SPRING, tintPrimary, tintText } from '../theme';
 import type { Conversation, User } from '../types';
 import { shortStamp } from '../utils/format';
+import { notificationPermission, requestNotificationPermission } from '../utils/notify';
 import UserAvatar from './UserAvatar';
 
 interface Props {
@@ -64,6 +66,7 @@ export default function Sidebar({
   const [accountAnchor, setAccountAnchor] = useState<HTMLElement | null>(null);
   const [rowMenu, setRowMenu] = useState<{ el: HTMLElement; id: string } | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Conversation | null>(null);
+  const [notifyPermission, setNotifyPermission] = useState(notificationPermission);
   const { mode, systemMode, setMode } = useColorScheme();
   const isDark = (mode === 'system' ? systemMode : mode) === 'dark';
 
@@ -152,6 +155,26 @@ export default function Sidebar({
                 slotProps={{ primary: { sx: { fontWeight: 600 } } }}
               />
             </MenuItem>
+            {notifyPermission !== 'granted' && notifyPermission !== 'unsupported' && (
+              <MenuItem
+                disabled={notifyPermission === 'denied'}
+                onClick={() => {
+                  setAccountAnchor(null);
+                  void requestNotificationPermission().then(setNotifyPermission);
+                }}
+              >
+                <ListItemIcon>
+                  <NotificationsActiveRoundedIcon fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary="Enable notifications"
+                  secondary={
+                    notifyPermission === 'denied' ? 'Blocked in browser settings' : undefined
+                  }
+                />
+              </MenuItem>
+            )}
+
             <MenuItem
               onClick={() => {
                 setAccountAnchor(null);

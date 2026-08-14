@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
@@ -7,8 +7,12 @@ import Paper from '@mui/material/Paper';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
+import Typography from '@mui/material/Typography';
 import { ACCENT_GRADIENT, EASE, EASE_SPRING, tintPaper, tintPrimary } from '../theme';
 import AttachFileRoundedIcon from '@mui/icons-material/AttachFileRounded';
+import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import MicRoundedIcon from '@mui/icons-material/MicRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SentimentSatisfiedAltRoundedIcon from '@mui/icons-material/SentimentSatisfiedAltRounded';
@@ -28,6 +32,10 @@ interface Props {
   /** False on backends that cannot store files (Firebase Storage needs a paid plan). */
   attachmentsEnabled?: boolean;
   onAttachmentBlocked?: () => void;
+  /** Set while an existing message is being rewritten. */
+  editing?: { id: string; text: string } | null;
+  onSaveEdit?: (text: string) => void;
+  onCancelEdit?: () => void;
 }
 
 export default function Composer({
@@ -36,11 +44,15 @@ export default function Composer({
   disabled,
   attachmentsEnabled = true,
   onAttachmentBlocked,
+  editing,
+  onSaveEdit,
+  onCancelEdit,
 }: Props) {
   const [text, setText] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const canSend = Boolean(text.trim() || attachments.length);
@@ -51,8 +63,20 @@ export default function Composer({
     typingTimer.current = setTimeout(() => onTyping(false), 1500);
   };
 
+  // Loading the message being edited into the field, and restoring on cancel.
+  useEffect(() => {
+    setText(editing ? editing.text : '');
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
   const send = () => {
     if (!canSend || disabled) return;
+
+    if (editing) {
+      onSaveEdit?.(text.trim());
+      return;
+    }
+
     onSend(text.trim(), attachments.length ? attachments : undefined);
     setText('');
     setAttachments([]);
@@ -77,6 +101,39 @@ export default function Composer({
   return (
     <Box sx={{ px: { xs: 1, md: 3 }, pb: { xs: 1, md: 2 }, pt: 1, minWidth: 0 }}>
       <Box sx={{ maxWidth: 900, mx: 'auto', minWidth: 0 }}>
+        {editing && (
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{
+              alignItems: 'center',
+              mb: 1,
+              px: 1.5,
+              py: 1,
+              borderRadius: 3,
+              borderLeft: '3px solid',
+              borderColor: 'primary.main',
+              bgcolor: (t) => tintPrimary(t, 0.1),
+              animation: `appFadeUp 220ms ${EASE} both`,
+            }}
+          >
+            <EditRoundedIcon sx={{ fontSize: 17, color: 'primary.main' }} />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, color: 'primary.main' }}>
+                Editing message
+              </Typography>
+              <Typography variant="body2" color="text.secondary" noWrap>
+                {editing.text}
+              </Typography>
+            </Box>
+            <Tooltip title="Cancel editing">
+              <IconButton size="small" onClick={onCancelEdit}>
+                <CloseRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        )}
+
         {attachments.length > 0 && (
           <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: 'wrap', gap: 1 }}>
             {attachments.map((attachment) => (
@@ -143,11 +200,12 @@ export default function Composer({
           />
 
           <InputBase
+            inputRef={inputRef}
             multiline
             maxRows={6}
             fullWidth
             disabled={disabled}
-            placeholder="Write a message…"
+            placeholder={editing ? 'Edit your message…' : 'Write a message…'}
             value={text}
             onChange={(event) => {
               setText(event.target.value);
@@ -159,6 +217,7 @@ export default function Composer({
                 event.preventDefault();
                 send();
               }
+              if (event.key === 'Escape' && editing) onCancelEdit?.();
             }}
             // Must stay at 16px on phones: iOS zooms the page when a focused
             // field is smaller, which shrinks the viewport and clips the layout.
@@ -166,7 +225,7 @@ export default function Composer({
           />
 
           {canSend ? (
-            <Tooltip title="Send">
+            <Tooltip title={editing ? 'Save changes' : 'Send'}>
               <IconButton
                 onClick={send}
                 sx={{
@@ -181,7 +240,7 @@ export default function Composer({
                   '&:hover': { background: ACCENT_GRADIENT, filter: 'brightness(1.08)' },
                 }}
               >
-                <SendRoundedIcon fontSize="small" />
+                {editing ? <CheckRoundedIcon fontSize="small" /> : <SendRoundedIcon fontSize="small" />}
               </IconButton>
             </Tooltip>
           ) : (
