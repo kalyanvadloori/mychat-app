@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
+import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
@@ -251,42 +249,57 @@ export default function MessageBubble({
         </Stack>
       </Box>
 
-      <Menu
-        anchorEl={menuAnchor}
+      {/* Icon-only action bar, floated above the bubble like a reaction strip. */}
+      <Popover
         open={Boolean(menuAnchor)}
+        anchorEl={menuAnchor}
         onClose={() => setMenuAnchor(null)}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { borderRadius: 3, minWidth: 180 } } }}
+        anchorOrigin={{ vertical: 'top', horizontal: mine ? 'right' : 'left' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: mine ? 'right' : 'left' }}
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 999,
+              px: 0.5,
+              py: 0.25,
+              mb: 0.5,
+              border: '1px solid',
+              borderColor: 'divider',
+              boxShadow: '0 12px 30px -12px rgba(15,23,42,0.6)',
+            },
+          },
+        }}
       >
-        {onEdit && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              onEdit(message);
-            }}
-          >
-            <ListItemIcon>
-              <EditRoundedIcon fontSize="small" />
-            </ListItemIcon>
-            Edit
-          </MenuItem>
-        )}
-        {onUnsend && (
-          <MenuItem
-            onClick={() => {
-              setMenuAnchor(null);
-              onUnsend(message);
-            }}
-            sx={{ color: 'error.main' }}
-          >
-            <ListItemIcon>
-              <UndoRoundedIcon fontSize="small" sx={{ color: 'error.main' }} />
-            </ListItemIcon>
-            Unsend
-          </MenuItem>
-        )}
-      </Menu>
+        <Stack direction="row" spacing={0.25} sx={{ alignItems: 'center' }}>
+          {onEdit && (
+            <Tooltip title="Edit">
+              <IconButton
+                aria-label="Edit message"
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onEdit(message);
+                }}
+              >
+                <EditRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+          {onUnsend && (
+            <Tooltip title="Unsend">
+              <IconButton
+                aria-label="Unsend message"
+                onClick={() => {
+                  setMenuAnchor(null);
+                  onUnsend(message);
+                }}
+                sx={{ color: 'error.main' }}
+              >
+                <UndoRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          )}
+        </Stack>
+      </Popover>
     </Stack>
   );
 }
