@@ -1,43 +1,30 @@
-import { useState, type FormEvent } from 'react';
+import { useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
-import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
 import { ACCENT_GRADIENT, BRAND_MARK, tintPrimary, tintSecondary } from '../theme';
 
+/** Google is the only sign-in method: no passwords to choose, forget or leak. */
 export default function LoginScreen() {
-  const { signIn, register, signInWithGoogle } = useAuth();
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin');
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const { signInWithGoogle } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const run = async (action: () => Promise<void>) => {
+  const signIn = async () => {
     setError(null);
     setBusy(true);
     try {
-      await action();
+      await signInWithGoogle();
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
       setBusy(false);
     }
-  };
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    void run(() =>
-      mode === 'signin' ? signIn(email, password) : register(name.trim(), email, password),
-    );
   };
 
   return (
@@ -60,11 +47,9 @@ export default function LoginScreen() {
       }}
     >
       <Paper
-        component="form"
-        onSubmit={submit}
         sx={{
           width: '100%',
-          maxWidth: 420,
+          maxWidth: 400,
           p: { xs: 3, sm: 4.5 },
           borderRadius: 5,
           border: '1px solid',
@@ -72,7 +57,7 @@ export default function LoginScreen() {
           boxShadow: '0 30px 70px -40px rgba(15,23,42,0.55)',
         }}
       >
-        <Stack spacing={1} sx={{ alignItems: 'center', mb: 3 }}>
+        <Stack spacing={1} sx={{ alignItems: 'center', mb: 4 }}>
           <Box
             sx={{
               width: 54,
@@ -89,13 +74,11 @@ export default function LoginScreen() {
           >
             {BRAND_MARK}
           </Box>
-          <Typography variant="h5" sx={{ fontWeight: 700 }}>
-            {mode === 'signin' ? 'Welcome back' : 'Create your account'}
+          <Typography variant="h5" sx={{ fontWeight: 700, textAlign: 'center' }}>
+            Welcome to MyChat
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-            {mode === 'signin'
-              ? 'Sign in to continue to MyChat'
-              : 'Sign up and start chatting in seconds'}
+            Sign in with Google to start chatting.
           </Typography>
         </Stack>
 
@@ -105,74 +88,24 @@ export default function LoginScreen() {
           </Alert>
         )}
 
-        <Stack spacing={2}>
-          {mode === 'signup' && (
-            <TextField
-              label="Full name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-              autoComplete="name"
-              fullWidth
-            />
-          )}
-          <TextField
-            label="Email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            autoComplete="email"
-            fullWidth
-          />
-          <TextField
-            label="Password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            helperText={mode === 'signup' ? 'At least 6 characters' : ' '}
-            fullWidth
-          />
+        <Button
+          fullWidth
+          size="large"
+          variant="contained"
+          startIcon={<GoogleIcon />}
+          loading={busy}
+          onClick={() => void signIn()}
+          sx={{ py: 1.35, background: ACCENT_GRADIENT }}
+        >
+          Continue with Google
+        </Button>
 
-          <Button
-            type="submit"
-            size="large"
-            variant="contained"
-            loading={busy}
-            sx={{ py: 1.3, background: ACCENT_GRADIENT }}
-          >
-            {mode === 'signin' ? 'Sign in' : 'Create account'}
-          </Button>
-
-          <Divider sx={{ color: 'text.secondary', fontSize: 12 }}>or</Divider>
-
-          <Button
-            size="large"
-            variant="outlined"
-            startIcon={<GoogleIcon />}
-            disabled={busy}
-            onClick={() => void run(signInWithGoogle)}
-            sx={{ py: 1.2 }}
-          >
-            Continue with Google
-          </Button>
-        </Stack>
-
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
-          {mode === 'signin' ? "Don't have an account? " : 'Already registered? '}
-          <Link
-            component="button"
-            type="button"
-            onClick={() => {
-              setMode(mode === 'signin' ? 'signup' : 'signin');
-              setError(null);
-            }}
-            sx={{ fontWeight: 600 }}
-          >
-            {mode === 'signin' ? 'Sign up' : 'Sign in'}
-          </Link>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ mt: 3, textAlign: 'center', display: 'block' }}
+        >
+          New here? Signing in with Google creates your account automatically.
         </Typography>
       </Paper>
     </Box>

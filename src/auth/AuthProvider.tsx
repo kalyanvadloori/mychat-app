@@ -1,12 +1,9 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
   GoogleAuthProvider,
-  createUserWithEmailAndPassword,
   onAuthStateChanged,
-  signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
-  updateProfile,
   type User as FirebaseUser,
 } from 'firebase/auth';
 import { auth, isFirebaseConfigured } from '../lib/firebase';
@@ -26,17 +23,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user,
       enabled: isFirebaseConfigured,
-
-      async signIn(email, password) {
-        await signInWithEmailAndPassword(auth(), email, password);
-      },
-
-      async register(name, email, password) {
-        const credential = await createUserWithEmailAndPassword(auth(), email, password);
-        await updateProfile(credential.user, { displayName: name });
-        // onAuthStateChanged already fired without the display name, so push the fresh object.
-        setUser({ ...credential.user, displayName: name } as FirebaseUser);
-      },
 
       async signInWithGoogle() {
         await signInWithPopup(auth(), new GoogleAuthProvider());
