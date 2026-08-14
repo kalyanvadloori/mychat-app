@@ -9,6 +9,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import { tintPaper, tintText } from '../theme';
 import type { User } from '../types';
@@ -24,6 +25,7 @@ interface Props {
 
 export default function NewChatDialog({ open, users, onClose, onSelect }: Props) {
   const [query, setQuery] = useState('');
+  const isTouch = useMediaQuery('(hover: none)');
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -36,12 +38,25 @@ export default function NewChatDialog({ open, users, onClose, onSelect }: Props)
       onClose={onClose}
       fullWidth
       maxWidth="xs"
-      slotProps={{ paper: { sx: { borderRadius: 4 } } }}
+      scroll="paper"
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: 4,
+            m: 2,
+            // Bound to the *visible* area, so an open keyboard shrinks the dialog
+            // instead of pushing its header off the top of the screen.
+            maxHeight: 'calc(var(--app-h, 100dvh) - 32px)',
+          },
+        },
+      }}
     >
       <DialogTitle sx={{ fontWeight: 700 }}>New chat</DialogTitle>
       <DialogContent sx={{ pb: 2 }}>
         <TextField
-          autoFocus
+          // Focusing on a phone throws up the keyboard before the user has even
+          // seen the list, so only desktop gets it.
+          autoFocus={!isTouch}
           fullWidth
           size="small"
           placeholder="Search people"
@@ -84,9 +99,12 @@ export default function NewChatDialog({ open, users, onClose, onSelect }: Props)
           >
             <List
               sx={{
-                maxHeight: { xs: '52vh', sm: 380 },
+                maxHeight: { xs: 'calc(var(--app-h, 100dvh) * 0.42)', sm: 380 },
                 overflowY: 'auto',
                 WebkitOverflowScrolling: 'touch',
+                // Stops the page behind the dialog from scrolling once this list
+                // reaches its end — the "page jumps" problem.
+                overscrollBehavior: 'contain',
                 // Keeps a visible track on platforms that allow styling it.
                 '&::-webkit-scrollbar': { width: 6 },
                 '&::-webkit-scrollbar-thumb': {
