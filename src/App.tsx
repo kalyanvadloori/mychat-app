@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
-import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Snackbar from '@mui/material/Snackbar';
 import Stack from '@mui/material/Stack';
@@ -19,8 +18,11 @@ import NewChatDialog from './components/NewChatDialog';
 import NightWeather from './components/NightWeather';
 import ProfilePanel from './components/ProfilePanel';
 import Sidebar from './components/Sidebar';
+import SplashScreen from './components/SplashScreen';
 import { disposeChatService, getChatService } from './services';
 import { ACCENT_GRADIENT, EASE, EASE_SPRING, tintPrimary, tintSecondary } from './theme';
+import { disablePush, onNotificationNavigate, refreshPushRegistration } from './lib/push';
+import { beginBootProgress, finishBootProgress } from './utils/bootProgress';
 import { showNotification } from './utils/notify';
 import type { Call, CallKind, Conversation, Message, User } from './types';
 
@@ -31,27 +33,47 @@ export default function App() {
   const { user, enabled, logout } = useAuth();
   useAppHeight();
 
-  if (enabled && user === undefined) {
-    return (
-      <Box sx={{ height: '100dvh', display: 'grid', placeItems: 'center' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
+  // `undefined` means Firebase has not reported yet — distinct from `null`, which
+  // is a settled "nobody is signed in".
+  const booting = enabled && user === undefined;
+  const atLogin = enabled && user === null;
 
-  if (enabled && !user) return <LoginScreen />;
+  /**
+   * Whether the login screen has been shown during this page's life. Reaching the
+   * chat through it means the user just signed in, which is the only case that
+   * gets the loading screen — opening the app already signed in goes straight to
+   * the chat, with no splash in the way.
+   */
+  const cameFromLogin = useRef(false);
+  if (atLogin) cameFromLogin.current = true;
+
+  // Nothing to show while auth reports back: it resolves from a local token in a
+  // frame or two, and a loading screen for that is more interruption than help.
+  if (booting) return <Box sx={{ height: '100dvh', bgcolor: 'background.default' }} />;
+
+  if (atLogin) return <LoginScreen />;
 
   const signOut = async () => {
+    // Revoke this browser's push token first: after `logout()` there is no
+    // identity left to delete it under, and the next person to use this browser
+    // would keep receiving the previous account's messages.
+    await disablePush();
     // Stop the Firestore listeners before auth goes away, or they throw on teardown.
     disposeChatService();
     await logout();
   };
 
   // Remount the whole chat when the signed-in identity changes.
-  return <Chat key={user?.uid ?? 'mock'} onSignOut={enabled ? () => void signOut() : undefined} />;
+  return (
+    <Chat
+      key={user?.uid ?? 'mock'}
+      onSignOut={enabled ? () => void signOut() : undefined}
+      showLoading={cameFromLogin.current}
+    />
+  );
 }
 
-function Chat({ onSignOut }: { onSignOut?: () => void }) {
+function Chat({ onSignOut, showLoading }: { onSignOut?: () => void; showLoading: boolean }) {
   const theme = useTheme();
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'));
   const { user, enabled } = useAuth();
@@ -70,10 +92,29 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
 
+  // Both streams have to report once before the chat is worth showing: landing on
+  // an empty sidebar that fills in a moment later reads as "you have no chats".
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [threadsLoaded, setThreadsLoaded] = useState(false);
+
   const currentUser = service.currentUser();
 
-  useEffect(() => service.subscribeUsers(setUsers), [service]);
-  useEffect(() => service.subscribeConversations(setConversations), [service]);
+  useEffect(
+    () =>
+      service.subscribeUsers((next) => {
+        setUsers(next);
+        setUsersLoaded(true);
+      }),
+    [service],
+  );
+  useEffect(
+    () =>
+      service.subscribeConversations((next) => {
+        setConversations(next);
+        setThreadsLoaded(true);
+      }),
+    [service],
+  );
 
   useEffect(() => {
     if (!selectedId) {
@@ -91,10 +132,9 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     };
   }, [service, selectedId]);
 
-  // On desktop the thread pane is always visible, so open the newest chat by default.
-  useEffect(() => {
-    if (isDesktop && !selectedId && conversations.length) setSelectedId(conversations[0]!.id);
-  }, [isDesktop, selectedId, conversations]);
+  // No auto-open on desktop: signing in should land on the empty state, not drop
+  // you into a conversation you did not choose — which would also mark it read
+  // and start its viewing heartbeat behind your back.
 
   // Clear the unread badge again when new messages land in the open thread.
   useEffect(() => {
@@ -150,6 +190,19 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
     document.addEventListener('visibilitychange', onHidden);
     return () => document.removeEventListener('visibilitychange', onHidden);
   }, [service]);
+
+  /**
+   * FCM tokens rotate, and a stale one stops receiving anything without any
+   * outward sign, so a browser that already has permission re-registers on every
+   * sign-in rather than only the first.
+   */
+  useEffect(() => {
+    if (enabled) void refreshPushRegistration();
+  }, [enabled]);
+
+  // Tapping a push notification focuses the existing tab; this opens the thread
+  // it was about.
+  useEffect(() => onNotificationNavigate((id) => openConversation(id)), [openConversation]);
 
   /**
    * Notifies about incoming messages, driven off the conversation list rather
@@ -367,6 +420,49 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
   const showSidebar = isDesktop || !selectedId;
   const showThread = isDesktop || Boolean(selectedId);
 
+  /**
+   * The splash covering the chat until its data lands, in three steps: showing,
+   * playing its exit, gone. Three states rather than a boolean because unmounting
+   * the moment the data arrives would cut the exit animation off before it ran.
+   *
+   * It starts at `gone` unless this render followed a sign-in, so opening the app
+   * with a live session never puts a loading screen in front of anyone.
+   */
+  const [splashPhase, setSplashPhase] = useState<'shown' | 'leaving' | 'gone'>(
+    showLoading ? 'shown' : 'gone',
+  );
+  const dataLoaded = usersLoaded && threadsLoaded;
+
+  useEffect(() => {
+    if (splashPhase === 'shown') beginBootProgress();
+  }, [splashPhase]);
+
+  // Never let a stalled listener strand someone on the splash: past this point
+  // the chat is shown regardless, empty state and all.
+  useEffect(() => {
+    if (dataLoaded || splashPhase === 'gone') return;
+    const timer = window.setTimeout(() => {
+      setUsersLoaded(true);
+      setThreadsLoaded(true);
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [dataLoaded, splashPhase]);
+
+  useEffect(() => {
+    if (!dataLoaded || splashPhase !== 'shown') return;
+    finishBootProgress();
+    // Long enough for the counter to visibly land on 100 before it withdraws.
+    const timer = window.setTimeout(() => setSplashPhase('leaving'), 460);
+    return () => window.clearTimeout(timer);
+  }, [dataLoaded, splashPhase]);
+
+  useEffect(() => {
+    if (splashPhase !== 'leaving') return;
+    // Matches the exit animation in SplashScreen.
+    const timer = window.setTimeout(() => setSplashPhase('gone'), 420);
+    return () => window.clearTimeout(timer);
+  }, [splashPhase]);
+
   return (
     <Box
       sx={{
@@ -518,6 +614,11 @@ function Chat({ onSignOut }: { onSignOut?: () => void }) {
         message={notice}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
       />
+
+      {/* Last child, so it covers the shell it is waiting on. */}
+      {splashPhase !== 'gone' && (
+        <SplashScreen label="Loading your chats" out={splashPhase === 'leaving'} />
+      )}
     </Box>
   );
 }

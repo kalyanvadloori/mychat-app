@@ -20,7 +20,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import type { User as FirebaseUser } from 'firebase/auth';
-import { db } from '../lib/firebase';
+import { auth, db } from '../lib/firebase';
 import type {
   Attachment,
   CallInvite,
@@ -146,6 +146,34 @@ class FirebaseChatService implements ChatService {
     });
 
     this.lastTypingWrite.set(conversationId, false);
+
+    // Deliberately not awaited: the message is already delivered by Firestore, and
+    // a slow or missing push endpoint must never hold up the composer.
+    void this.pushToPeer(conversationId, text);
+  }
+
+  /**
+   * Asks the server to notify the other person. Only the conversation id is sent
+   * — the endpoint works out the recipient from the thread itself, so a caller
+   * cannot aim a notification at someone they do not share a conversation with.
+   */
+  private async pushToPeer(conversationId: string, text: string) {
+    const user = auth().currentUser;
+    if (!user) return;
+
+    try {
+      await fetch('/.netlify/functions/send-push', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${await user.getIdToken()}`,
+        },
+        body: JSON.stringify({ conversationId, text }),
+      });
+    } catch {
+      // Offline, or running `vite` without `netlify dev`. In-tab notifications
+      // still work; only the closed-app case is lost.
+    }
   }
 
   async logCall(conversationId: string, call: CallLog) {

@@ -9,7 +9,17 @@ import useMediaQuery from '@mui/material/useMediaQuery';
 import GoogleIcon from '@mui/icons-material/Google';
 import { authErrorMessage, useAuth } from '../auth/context';
 import LogoOrbit from './LogoOrbit';
-import { ACCENT_GRADIENT, BRAND_MARK, EASE, EASE_SPRING, tintPrimary, tintSecondary } from '../theme';
+import {
+  ACCENT,
+  ACCENT_2,
+  ACCENT_GRADIENT,
+  BRAND_MARK,
+  EASE,
+  EASE_SPRING,
+  tintPaper,
+  tintPrimary,
+  tintSecondary,
+} from '../theme';
 
 /** Google is the only sign-in method: no passwords to choose, forget or leak. */
 export default function LoginScreen() {
@@ -64,6 +74,24 @@ export default function LoginScreen() {
              radial-gradient(45% 40% at 88% 92%, ${tintSecondary(t, 0.26)} 0%, transparent 70%)`,
           animation: 'appDrift 18s ease-in-out infinite',
         },
+
+        // The card's entrance: rises and resolves out of a blur, as though it were
+        // being focused rather than simply faded in.
+        '@keyframes loginRise': {
+          '0%': {
+            opacity: 0,
+            transform: 'translateY(34px) scale(0.94)',
+            filter: 'blur(14px)',
+          },
+          '60%': { opacity: 1, filter: 'blur(0px)' },
+          '100%': { opacity: 1, transform: 'none', filter: 'blur(0px)' },
+        },
+        // A single pass of light across the card, once, just after it lands.
+        '@keyframes loginSheen': {
+          '0%': { transform: 'translateX(-120%) rotate(8deg)', opacity: 0 },
+          '18%': { opacity: 1 },
+          '100%': { transform: 'translateX(220%) rotate(8deg)', opacity: 0 },
+        },
       }}
     >
       <Paper
@@ -75,13 +103,51 @@ export default function LoginScreen() {
           my: 'auto',
           p: { xs: 2.5, sm: 4.5 },
           borderRadius: 5,
-          border: '1px solid',
-          borderColor: 'divider',
-          boxShadow: '0 30px 70px -40px rgba(15,23,42,0.55)',
-          animation: `appFadeUp 480ms ${EASE} both`,
+          // Glass rather than a solid card, so the drifting wash behind it stays
+          // visible through the surface instead of being covered by it.
+          backgroundColor: (t) => tintPaper(t, 0.72),
+          backdropFilter: 'blur(22px) saturate(150%)',
+          border: '1px solid transparent',
+          boxShadow: (t) =>
+            `0 30px 70px -40px rgba(15,23,42,0.55), 0 0 60px -30px ${tintPrimary(t, 0.9)}`,
+          overflow: 'hidden',
+          animation: `loginRise 720ms ${EASE} both`,
+
+          /* Gradient hairline. A gradient cannot be a border colour, so the ring is
+             painted as a background and the card's interior is masked back out of
+             it — leaving only the 1px frame. */
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            borderRadius: 'inherit',
+            padding: '1px',
+            pointerEvents: 'none',
+            background: `linear-gradient(140deg, ${ACCENT}AA 0%, transparent 38%, transparent 62%, ${ACCENT_2}AA 100%)`,
+            WebkitMask: 'linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0)',
+            WebkitMaskComposite: 'xor',
+            maskComposite: 'exclude',
+          },
         }}
       >
-        <Stack spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
+        {/* One pass of light over the card as it settles. Purely decorative, and
+            clipped by the card's own overflow. */}
+        <Box
+          aria-hidden
+          sx={{
+            position: 'absolute',
+            top: '-30%',
+            left: 0,
+            width: '38%',
+            height: '160%',
+            pointerEvents: 'none',
+            background:
+              'linear-gradient(90deg, transparent, rgba(255,255,255,0.38), transparent)',
+            animation: `loginSheen 1400ms ${EASE} 420ms both`,
+          }}
+        />
+
+        <Stack spacing={1} sx={{ position: 'relative', alignItems: 'center', mb: 2 }}>
           <LogoOrbit size={compact ? 148 : 190}>
             <Box
               sx={{
@@ -109,9 +175,27 @@ export default function LoginScreen() {
           </LogoOrbit>
           <Typography
             variant="h5"
-            sx={{ fontWeight: 700, textAlign: 'center', animation: `appFadeUp 460ms ${EASE} 200ms both` }}
+            sx={{
+              fontWeight: 800,
+              letterSpacing: '-0.02em',
+              textAlign: 'center',
+              animation: `appFadeUp 460ms ${EASE} 200ms both`,
+            }}
           >
-            Welcome to MyChat
+            Welcome to{' '}
+            {/* Same gradient wordmark as the splash, so the two screens read as
+                one brand rather than two designs. */}
+            <Box
+              component="span"
+              sx={{
+                backgroundImage: ACCENT_GRADIENT,
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+              }}
+            >
+              MyChat
+            </Box>
           </Typography>
           <Typography
             variant="body2"
@@ -137,10 +221,33 @@ export default function LoginScreen() {
           onClick={() => void signIn()}
           sx={{
             py: 1.35,
+            position: 'relative',
+            overflow: 'hidden',
             background: ACCENT_GRADIENT,
             boxShadow: '0 16px 32px -16px rgba(99,102,241,0.9)',
             animation: `appFadeUp 460ms ${EASE} 360ms both`,
-            '&:hover': { filter: 'brightness(1.06)' },
+            transition: `transform 300ms ${EASE_SPRING}, box-shadow 240ms ease, filter 200ms ease`,
+            '&:hover': {
+              filter: 'brightness(1.06)',
+              transform: 'translateY(-2px)',
+              boxShadow: '0 22px 40px -16px rgba(99,102,241,0.95)',
+            },
+            // Light sweeps across the button on hover, parked off to the left
+            // until then so it never plays on its own.
+            '&::before': {
+              content: '""',
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '45%',
+              height: '100%',
+              pointerEvents: 'none',
+              transform: 'translateX(-160%) skewX(-18deg)',
+              background:
+                'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+              transition: `transform 620ms ${EASE}`,
+            },
+            '&:hover::before': { transform: 'translateX(320%) skewX(-18deg)' },
           }}
         >
           Continue with Google

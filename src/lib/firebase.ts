@@ -2,7 +2,8 @@ import { initializeApp, type FirebaseApp } from 'firebase/app';
 import { getAuth, type Auth } from 'firebase/auth';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 
-const config = {
+/** Exported so the push service worker can be handed the same values. */
+export const config = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -20,6 +21,10 @@ export const isFirebaseConfigured = Boolean(config.apiKey && config.projectId &&
 let app: FirebaseApp | undefined;
 let authInstance: Auth | undefined;
 let dbInstance: Firestore | undefined;
+
+export function firebaseApp() {
+  return ensureApp();
+}
 
 function ensureApp() {
   if (!isFirebaseConfigured) {

@@ -34,7 +34,8 @@ import VolumeOffRoundedIcon from '@mui/icons-material/VolumeOffRounded';
 import { ACCENT_GRADIENT, BRAND_MARK, EASE, EASE_SPRING, tintPrimary, tintText } from '../theme';
 import type { Conversation, User } from '../types';
 import { shortStamp } from '../utils/format';
-import { notificationPermission, requestNotificationPermission } from '../utils/notify';
+import { enablePush } from '../lib/push';
+import { notificationPermission } from '../utils/notify';
 import UserAvatar from './UserAvatar';
 
 interface Props {
@@ -160,7 +161,9 @@ export default function Sidebar({
                 disabled={notifyPermission === 'denied'}
                 onClick={() => {
                   setAccountAnchor(null);
-                  void requestNotificationPermission().then(setNotifyPermission);
+                  // Grants permission *and* registers this browser for push, so
+                  // one tap covers both the in-tab and app-closed cases.
+                  void enablePush().then(setNotifyPermission);
                 }}
               >
                 <ListItemIcon>

@@ -19,6 +19,16 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if signedIn() && request.auth.uid == userId;
       allow delete: if false;
+
+      // Push registrations, one document per browser, keyed by the FCM token.
+      //
+      // Not readable by anyone: only the `send-push` function needs them, and it
+      // uses the service account, which bypasses these rules entirely. Leaving
+      // them readable would let any signed-in user harvest everyone's tokens.
+      match /pushTokens/{token} {
+        allow read: if false;
+        allow write: if signedIn() && request.auth.uid == userId;
+      }
     }
 
     match /conversations/{conversationId} {
